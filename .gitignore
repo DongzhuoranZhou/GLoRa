@@ -1,0 +1,11 @@
+/datasets/
+/datasets_log/
+/results/
+.idea
+__pycache__/
+/lrgb.egg-info/
+/visualization/example_vis.py
+*.npy
+*.png
+/notebook/
+/visualization/
