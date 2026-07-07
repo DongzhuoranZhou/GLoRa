@@ -8,3 +8,5 @@ output/
 *.log
 *.out
 *.toc
+main.pdf
+*.synctex.gz
