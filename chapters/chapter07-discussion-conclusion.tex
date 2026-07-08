@@ -2,7 +2,7 @@
 \label{chap:discussion-conclusion}
 
 The thesis has studied long-range dependency learning in graph neural networks through benchmark design.
-The earlier chapters introduced message passing, explained why distant information is difficult to use, reviewed the standard explanations of long-range failure, and situated GLoRa among existing methods and benchmarks.
+The earlier chapters introduced message passing, explained why information from nodes at large graph distance is difficult to use, reviewed the standard explanations of long-range failure, and situated GLoRa among existing methods and benchmarks.
 The included paper contributes GLoRa, a benchmark generator that tests whether a graph learning system can learn a path-aware dependency of a specified length \cite{zhou2025glora}.
 The conclusion draws out the thesis-level consequences, states the main limitations, and outlines directions for future work.
 
@@ -10,9 +10,9 @@ The conclusion draws out the thesis-level consequences, states the main limitati
 
 Graph neural networks are built around local computation.
 At each layer, a node aggregates information from nearby nodes and updates its representation.
-After several layers, information can travel farther through the graph.
+After several layers, information from nodes at larger graph distance can affect the target representation.
 This mechanism gives GNNs a useful structural bias, but it also makes long-range dependency learning difficult.
-When the correct label of a target node depends on a distant source node, the relevant signal must survive many local transformations.
+When the correct label of a target node depends on a source node at large graph distance, the relevant source information must be preserved across many message-passing layers.
 The literature often explains the resulting failures through over-smoothing, over-squashing, and vanishing gradients \cite{li2018deeper,alon2021bottleneck,glorot2010difficulty}.
 
 The thesis has argued that there is also an evaluation problem.
@@ -81,9 +81,9 @@ It means that the model failed a controlled path-aware dependency test.
 
 The second limitation is the chosen notion of dependency.
 The paper uses a path-aware definition.
-This is a deliberate and useful choice, because many graph-learning intuitions involve information moving along paths.
+This is a deliberate and useful choice, because many graph-learning intuitions involve information being propagated along paths.
 Still, not every long-range dependency is path-aware in this exact sense.
-Some tasks may depend on sets of distant nodes, graph cuts, spectral properties, counts over regions, or interactions between several distant structures rather than a single source-to-target path.
+Some tasks may depend on sets of nodes at large graph distance, graph cuts, spectral properties, counts over regions, or interactions between several nonlocal structures rather than a single source-to-target path.
 GLoRa therefore covers an important dependency family, not the whole space of possible long-range graph functions.
 
 The third limitation is that the target function has a simple feature pattern.
@@ -111,19 +111,19 @@ That is a limitation, but it is also one of the reasons the benchmark is useful.
 One direction is to extend the benchmark family.
 GLoRa tests a source-to-target path condition with holes.
 Future generators could preserve the same principles while varying the dependency type.
-Examples include multiple sources, several interacting paths, paths with ordered labels, dependencies that require comparing two distant nodes, and graph-level targets whose label depends on a certified long-range structure.
+Examples include multiple sources, several interacting paths, paths with ordered labels, dependencies that require comparing two nodes at large graph distance, and graph-level targets whose label depends on a certified long-range structure.
 The design rule should remain the same: the benchmark should rule out shortcut functions and ensure that at least one intended fitting function is expressible by the evaluated model family.
 
 Another direction is to build stronger diagnostics.
 The GLoRa paper reports diagnostics that do not support over-smoothing, over-squashing, or vanishing gradients as explanations for the observed degradation.
 Future work should test more specific hypotheses.
-For example, diagnostics could measure whether models learn a finite-state propagation strategy, whether they preserve source identity over distance, whether attention heads align with valid paths, or whether errors arise from confusing alternative chains with the main chain.
+For example, diagnostics could measure whether models learn a finite-state propagation strategy, whether they preserve source identity across graph distance, whether attention heads align with valid paths, or whether errors arise from confusing alternative chains with the main chain.
 Such diagnostics would move beyond naming a failure mode and toward identifying the mechanism that prevents learning.
 
 Architectural work is a third direction.
-The relatively strong performance of gated-edge systems suggests that controlled information flow may matter.
-Future models could make the path-state structure more explicit, for example by using gates, memory mechanisms, recurrent propagation, or learned path filters that preserve a small amount of discrete information across many hops.
-The goal should not be only to increase communication range.
+The relatively strong performance of gated-edge systems suggests that controlled message propagation may matter.
+Future models could make the path information that must be preserved more explicit, for example by using gates, memory mechanisms, recurrent propagation, or learned path filters that preserve a small amount of discrete information across many hops.
+The goal should not be only to increase the range of message passing.
 It should be to preserve the right information over that range.
 GLoRa is useful here because it can test whether an architectural idea actually improves the learnable dependency length.
 
@@ -141,7 +141,7 @@ GLoRa provides one concrete template for such reporting.
 \section{Concluding Remarks}
 
 Long-range dependency learning remains a central challenge for graph neural networks.
-The challenge is architectural, because local message passing must transport information over distance.
+The challenge is architectural, because local message passing must propagate information across graph distance.
 It is also an optimization problem, because deeper computation can be harder to train.
 This thesis has emphasized a third aspect: a score is only meaningful if the benchmark rules out easier explanations for that score.
 

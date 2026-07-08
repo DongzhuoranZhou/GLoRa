@@ -21,7 +21,7 @@ The final section interprets GLoRa as the methodological contribution that ties 
 \label{sec:glora-motivation}
 
 Long-range dependency learning is often discussed as a model problem.
-Message-passing graph neural networks use local updates, so information from a distant node must be transported through a sequence of intermediate nodes before it can influence the target prediction.
+Message-passing graph neural networks update node representations through local neighbourhood aggregation, so information from a source node at large graph distance can affect the target only after enough message-passing layers.
 As the relevant distance grows, several difficulties may appear.
 Node representations may become too similar, information from many paths may be compressed into a small representation, or the gradients needed to train early layers may become too small \cite{li2018deeper,alon2021bottleneck,glorot2010difficulty}.
 These explanations motivate many architectural changes, including residual connections, normalization schemes, rewiring methods, diffusion methods, and graph transformer systems.
@@ -29,10 +29,10 @@ These explanations motivate many architectural changes, including residual conne
 GLoRa starts from a different but complementary question.
 Before deciding which architecture is best, one must know what the benchmark score certifies.
 The central evaluation question is:
-given a length $d$, has the system learned a function whose prediction for a target node genuinely depends on information carried along a path of length $d$?
+given a length $d$, has the system learned a function whose prediction for a target node genuinely depends on the distance and path information of a source-to-target path of length $d$?
 This question is stronger than asking whether a system has high accuracy on a dataset whose labels were generated from a long-range rule.
 A dataset can have more than one fitting function.
-One function may use the intended long path, while another may exploit a local count, a global graph statistic, a source-node marker, or an artifact of how positive and negative examples were generated.
+One function may use the intended source-to-target path of length $d$, while another may exploit a local count, a global graph statistic, a source-node marker, or an artifact of how positive and negative examples were generated.
 If both functions fit the examples, high test accuracy does not distinguish a model that learned the long-range dependency from a model that learned the shortcut.
 
 Real-world benchmarks are important because they represent practical tasks, but they are weak evidence for this particular claim.
@@ -46,7 +46,7 @@ Synthetic benchmarks offer more control, but only if they are designed with care
 A synthetic benchmark can choose the graph structure, the node features, and the target function.
 This makes it possible to set the dependency length directly.
 However, a simple synthetic construction can still be misleading.
-If every positive example has no hole and every negative example has one visible hole, a model can solve the task by detecting the hole rather than by testing whether information travels from the source to the target through a valid path.
+If every positive example has no hole and every negative example has one visible hole, a model can solve the task by detecting the hole rather than by testing whether information is propagated from the source to the target through a valid path.
 If the only source node has a unique local degree pattern, a model can detect the source rather than learning the path relation.
 If graph size differs between classes, a graph-level statistic may solve the benchmark.
 The design challenge is therefore to make the intended dependency necessary, not merely present.
@@ -82,7 +82,7 @@ The paper uses a path-aware formalization of long-range dependency.
 The phrase ``path-aware'' matters.
 It does not try to capture every possible meaning of long-range dependence in graphs.
 Instead, it captures the kind of dependency where the target label depends on information that must be preserved along a particular path.
-In this setting, it is not enough that a distant node exists somewhere in the graph.
+In this setting, it is not enough that a source node at large graph distance exists somewhere in the graph.
 The prediction must depend on the relation between the source $v_0$, the target $v_d$, and the intermediate nodes that connect them.
 
 The formal definition in the paper can be read as three tests on a node-classification function.
@@ -141,7 +141,7 @@ For a positive example, this chain has no hole.
 For a negative example, one non-target intermediate node on the main chain is turned into a hole.
 If the generator stopped here, the task would be too easy for the wrong reason.
 A classifier could simply ask whether the graph contains any hole outside the target node.
-That question does not require transporting information from the source to the target.
+That question does not require propagating information from the source to the target.
 
 The second part adds alternative chains.
 Each alternative chain connects two points that already lie on previously generated chains.
@@ -163,8 +163,8 @@ Because edges point toward the target, the number of paths leading into $v_d$ is
 This number is sampled between five and ten in the paper's algorithm.
 The bound does not grow with $d$.
 This fact later becomes important in the diagnostic argument about over-squashing.
-In an undirected version, even a simple chain can create many walks when messages can move back and forth.
-The directed construction keeps the evaluation focused on longer dependency length rather than on an exponentially growing number of routes.
+In an undirected version, even a simple chain can create many walks when message passing can use both edge directions.
+The directed construction keeps the evaluation focused on longer dependency length rather than on an exponentially growing number of source-to-target paths.
 
 \section{Examples and the Role of Shortcuts}
 \label{sec:glora-shortcuts}
@@ -192,7 +192,7 @@ Other shortcuts are more subtle.
 If the source is always the only node with no incoming edges, a model may detect the source by local degree rather than by a path condition.
 If positive examples have a different number of nodes or edges than negative examples, graph size can become predictive.
 If additional paths appear only in one class, the number of paths can become a class marker.
-If the target node has a different local neighbourhood in positive and negative examples, a short-range message-passing model can perform well without using distant information.
+If the target node has a different local neighbourhood in positive and negative examples, a short-range message-passing model can perform well without using information from nodes at large graph distance.
 These shortcuts are not implementation details.
 They decide what conclusion can be drawn from the benchmark score.
 
@@ -295,15 +295,15 @@ Some systems perform better than others, but even the best systems perform poorl
 The paper therefore concludes that the evaluated systems do not provide reliable evidence of learning the larger dependency lengths tested by GLoRa \cite{zhou2025glora}.
 
 The best-performing systems are the ones that use gated edges, especially GatedGCN and gated variants such as DenseGatedGCN and ResGatedGCN.
-Gating may help preserve or regulate information as it moves along a path.
+Gating may help preserve or regulate information as it is propagated along a path.
 The result points to a plausible architectural direction, but it does not solve the problem.
 Even with gated edges, performance still degrades at modest dependency lengths.
 
 The transformer-based systems do not dominate the benchmark.
-This is important because graph transformers change the communication pattern more radically than ordinary message passing.
+This is important because graph transformers change the interaction pattern more radically than ordinary message passing.
 They can, in principle, allow broader interactions between nodes.
-However, broad communication is not the same as learning the specific source-to-target path condition.
-If attention does not learn the right structural relation, the extra communication does not certify path-aware dependency learning.
+However, broad attention is not the same as learning the specific source-to-target path condition.
+If attention does not learn the right structural relation, the extra interactions do not certify path-aware dependency learning.
 GLoRa therefore separates two ideas that are sometimes conflated: the ability to exchange information globally and the ability to learn the intended long-range graph dependency.
 
 The results also clarify the status of methods designed for over-smoothing and over-squashing.
@@ -351,8 +351,8 @@ Therefore, the number of source-to-target paths remains bounded independently of
 The task becomes longer because the path gets longer, not because an exponentially growing number of paths must be compressed into the target representation.
 
 This point depends on directedness.
-In an undirected graph, messages can move back and forth, and even a simple chain can induce many possible walks into the target.
-That would make it harder to separate longer dependency length from path-volume compression.
+In an undirected graph, message passing can use both edge directions, and even a simple chain can induce many possible walks into the target.
+That would make it harder to separate longer dependency length from the compression of many paths into the target representation.
 The directed benchmark therefore has a conceptual advantage.
 It lets the diagnostic argument say that the benchmark structure does not directly support an over-squashing explanation, because the construction does not create the many-path bottleneck that over-squashing is meant to describe.
 
@@ -369,7 +369,7 @@ This result is also consistent with the training protocol.
 The evaluated systems use standard techniques that help gradient flow, including AdamW, weight initialization, gradient clipping, ReLU activations, and batch normalization.
 These techniques do not guarantee success on GLoRa, but they weaken the explanation that the models simply could not train because of vanishing gradients.
 The failure is therefore sharper for the inspected systems.
-They are given enough layers for communication, the intended function is expressible, the measured target representations do not collapse, the directed graphs avoid uncontrolled path compression, and the measured gradients do not vanish.
+They are given enough message-passing layers, the intended function is expressible, the measured target representations do not collapse, the directed graphs avoid uncontrolled path compression, and the measured gradients do not vanish.
 Yet these systems still fail at modest dependency lengths.
 
 \section{Thesis-Level Interpretation}

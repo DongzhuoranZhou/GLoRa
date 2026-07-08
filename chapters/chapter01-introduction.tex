@@ -2,18 +2,18 @@
 
 Graphs represent entities together with the relations that connect them.
 They appear in molecular structures, web links, recommendation systems, road networks, financial transactions, and many other domains where the object of interest is not independent of its context.
-A prediction about one node may depend on nearby nodes, on a wider neighbourhood, or on a particular chain of relations that reaches far through the graph.
+A prediction about one node may depend on nearby nodes, on a wider neighbourhood, or on a particular path that spans many hops in the graph.
 
 Graph neural networks (GNNs) are a central family of models for learning from this kind of data \cite{scarselli2008graph}.
 Their usual design is based on message passing.
 At each layer, a node receives information from its neighbours, combines that information with its current representation, and passes the result to the next layer.
 After one layer, a node can use information from its immediate neighbours.
-After several layers, it can use information from nodes farther away.
+After several layers, it can use information from nodes at larger graph distance.
 
-This local update rule is one of the main strengths of GNNs.
+This message-passing update rule is one of the main strengths of GNNs.
 It lets a model process graphs of different sizes, reuse parameters across the graph, and respect the fact that the order of nodes in memory should not change the answer.
 The same rule also creates the central difficulty studied here.
-If the correct prediction for a node depends on information many edges away, that information must survive many local updates before it can affect the final prediction.
+If the correct prediction for a node depends on information at large graph distance, that information must be preserved across many message-passing layers before it can affect the final prediction.
 
 The thesis studies this difficulty through benchmark design.
 A high score on a graph dataset is useful only after one knows what the score certifies.
@@ -32,7 +32,7 @@ It then argues that evaluation is part of the technical problem, states the rese
 
 Many important machine learning problems are relational.
 In a molecule, the behaviour of one atom depends on the structure in which it is embedded.
-In a social network, a user's behaviour may depend on people nearby, on communities farther away, or on chains of influence that pass through several intermediaries.
+In a social network, a user's behaviour may depend on nearby users, on communities at larger graph distance, or on chains of influence that pass through several intermediaries.
 In a traffic network, congestion at one location may depend on roads and intersections that are not adjacent to it.
 In a financial network, suspicious activity can involve a sequence of transactions spread across many accounts.
 
@@ -44,7 +44,7 @@ Graph learning methods are designed to use that information directly.
 GNNs became influential because they provide a flexible way to learn over such relational data \cite{scarselli2008graph}.
 Early and widely used architectures include graph convolutional networks, GraphSAGE, graph attention networks, gated graph neural networks, simplified graph convolution, and graph isomorphism networks \cite{kipf2017semi,hamilton2017graphsage,velickovic2018gat,li2016ggnn,wu2019sgc,xu2019gin}.
 They differ in how they aggregate and transform neighbourhood information.
-Despite these differences, they share the idea that node representations are built through repeated local interaction.
+Despite these differences, they share the idea that node representations are built through repeated one-hop neighbourhood aggregation.
 This shared idea gives them a useful inductive bias for graph-structured data.
 
 The range of applications also shows why long-range graph learning cannot be treated as a narrow technical corner case.
@@ -55,19 +55,19 @@ Biochemical tasks include protein interaction and drug side-effect prediction, w
 
 These domains do not all require the same model or the same definition of distance.
 They do show that learning from graphs often means learning from relations that extend beyond immediate neighbours.
-For this reason, the ability to use distant information is an important part of what graph learning systems are expected to do.
+For this reason, the ability to use information at large graph distance is an important part of what graph learning systems are expected to do.
 It is also an ability that is difficult to measure directly.
 
 \section{Long-Range Dependencies in Graphs}
 
-At a high level, a prediction has a long-range dependency when the correct answer depends on information far from the prediction target.
-In node classification, the target is a node, and the relevant information may lie several edges away.
-The prediction may depend not only on the remote node itself, but also on the path, pattern, or interaction that connects it to the target.
+At a high level, a prediction has a long-range dependency when the correct answer depends on information at large graph distance from the prediction target.
+In node classification, the target is a node, and the relevant information may lie several hops away.
+The prediction may depend not only on the source node itself, but also on the path, pattern, or interaction that connects it to the target.
 
 Graph distance is the basic way to speak about range in this thesis.
-If a signal is $d$ edges away from the target node, a local message-passing GNN needs at least $d$ layers before the signal can reach the target through ordinary neighbour aggregation.
+If the source information is at graph distance $d$ from the target node, a local message-passing GNN needs at least $d$ layers before that information can affect the target representation through one-hop neighbourhood aggregation.
 Existence in the graph is therefore not enough.
-The information must be transmitted, preserved, and used by the learned function.
+The information must be preserved across message-passing layers and used by the learned function.
 
 Long-range dependency learning is not the same as learning on a large graph.
 A large graph may have a local target function, while a smaller graph may contain a prediction that depends on a long chain of relations.
@@ -79,7 +79,7 @@ For the introduction, the main point is that a long-range dependency should make
 If a model can ignore the path and still classify all examples correctly, then the benchmark has not shown that the model learned the intended long-range behaviour.
 
 Many graph tasks contain correlations that are easier than the dependency they are meant to test.
-The label might correlate with node degree, graph size, local feature counts, or another statistic that does not require information to travel along the intended path.
+The label might correlate with node degree, graph size, local feature counts, or another statistic that does not require the learned function to use the intended path information.
 A model that uses such a statistic can obtain a high score while failing to learn the dependency of interest.
 Long-range dependency learning is therefore also an evaluation problem.
 
@@ -97,13 +97,13 @@ This is a natural concern for long-range dependency learning, because long paths
 
 Another common explanation is over-squashing.
 Over-squashing describes a bottleneck in which information from many nodes must be compressed into fixed-size representations as it moves through the graph \cite{alon2021bottleneck}.
-When a target node can be influenced by many distant nodes, the number of relevant signals may grow quickly.
+When a target node can be influenced by many nodes at large graph distance, the number of relevant signals may grow quickly.
 If those signals must pass through a narrow part of the graph or a fixed-dimensional vector, some information can be lost.
 
 A third explanation comes from optimization.
 Deep neural networks can suffer from vanishing gradients, where the training signal becomes weak as it is propagated backward through many layers \cite{glorot2010difficulty,bengio1994learning}.
 For graph models, this problem can interact with the graph structure.
-If the layers that first process the distant signal do not receive useful gradient information, the model may fail to learn how to preserve that signal.
+If the layers that first process the source information do not receive useful gradient information, the model may fail to learn how to preserve that information.
 
 These explanations have motivated many architectural changes.
 Some methods add residual or dense connections, normalization, dropout on edges, or propagation schemes designed to make deep graph models easier to train.
@@ -250,7 +250,7 @@ It defines the basic graph learning tasks used in the thesis and explains how lo
 It also discusses why expressivity matters when benchmarks are used to interpret model failure.
 
 Chapter 3 focuses on long-range dependencies in graphs.
-It explains the intuition behind dependency length, relates it to paths and graph distance, and gives examples from application areas where distant information can matter.
+It explains the intuition behind dependency length, relates it to paths and graph distance, and gives examples from application areas where information at large graph distance can matter.
 It also prepares the formal discussion of path-aware dependencies used by GLoRa.
 
 Chapter 4 reviews common explanations of long-range failure.

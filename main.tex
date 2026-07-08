@@ -33,8 +33,8 @@
 \frontmatter
 
 \begin{abstract}
-Graph neural networks learn by passing information between neighbouring nodes.
-This local mechanism is useful because it respects the structure of a graph, but it also creates a difficulty: a prediction may depend on information that is many edges away from the target node.
+Graph neural networks typically compute node representations through message-passing layers that aggregate one-hop neighbourhood information.
+This local mechanism is useful because it respects the structure of a graph, but it also creates a difficulty: a prediction may depend on information at large graph distance from the target node.
 Many graph learning systems lose accuracy in this setting.
 This failure is often explained through over-smoothing, over-squashing, or vanishing gradients.
 
@@ -49,8 +49,8 @@ It is also an evaluation problem, because a benchmark can reward shortcut functi
 \end{abstract}
 
 \begin{xabstract}[Sammendrag]
-Grafnevrale nettverk lærer ved å sende informasjon mellom nabonoder i en graf.
-Denne lokale mekanismen gjør at modellen kan utnytte grafstrukturen, men den skaper også en utfordring: en prediksjon kan avhenge av informasjon som ligger mange kanter unna målnoden.
+Grafnevrale nettverk lærer ved å beregne noderepresentasjoner gjennom lokal naboskapsaggregering.
+Denne lokale mekanismen gjør at modellen kan utnytte grafstrukturen, men den skaper også en utfordring: en prediksjon kan avhenge av informasjon som har stor grafavstand til målnoden.
 Mange grafbaserte læringssystemer mister nøyaktighet i slike situasjoner.
 Denne svikten forklares ofte med over-smoothing, over-squashing eller forsvinnende gradienter.
 

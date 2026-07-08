@@ -1,15 +1,15 @@
 \chapter{Explanations of Long-Range Failure}
 
 Message passing gives graph neural networks a simple way to use graph structure.
-At each layer, a node updates its node representation from its current state and from messages sent by neighbouring nodes.
+At each layer, a node updates its node representation from its previous-layer representation and from messages sent by neighbouring nodes.
 After one layer, the target node can use information from its immediate neighbours.
-After two layers, it can use information that has travelled through two edges.
-In the idealized picture, $d$ layers are enough for a signal from a source node at distance $d$ to reach the target node.
+After two layers, it can use information from nodes two hops away.
+In the idealized picture, $d$ layers are enough for a source node at graph distance $d$ to affect the target node.
 
 This idealized picture is useful, but reachability is not the same as learning.
 A signal may be reachable by message passing without being used by the trained model.
-The model must preserve the right information as messages move along the graph.
-It must have enough capacity to keep the relevant signal separate from irrelevant signals.
+The model must preserve the right information as message passing proceeds across successive layers.
+It must have enough capacity to keep the relevant source information separate from irrelevant information.
 It must also receive gradients that make the earlier layers learn the transformations needed for the final prediction.
 When these conditions fail, accuracy can drop as the dependency length $d$ increases.
 
@@ -24,7 +24,7 @@ This chapter treats these mechanisms as candidate explanations, not as automatic
 The distinction matters for the thesis.
 The included GLoRa paper studies tasks where the dependency length $d$ is controlled by construction.
 The experiments show that many graph learning systems fail as $d$ grows.
-This happens even though the intended dependency is expressible by standard message-passing systems and the number of layers is set large enough for the source node signal to reach the target node \cite{zhou2025glora}.
+This happens even though the intended dependency is expressible by standard message-passing systems and the number of layers is set large enough for the source information to affect the target node \cite{zhou2025glora}.
 The paper then asks whether the observed failure can be attributed to over-smoothing, over-squashing, or vanishing gradients.
 Its diagnostics do not support those explanations in the tested setting.
 This does not make the three phenomena unimportant.
@@ -32,24 +32,24 @@ It shows that a long-range performance drop is a symptom whose cause must be che
 
 \section{What a Candidate Explanation Must Explain}
 
-A long-range task is not hard merely because two nodes are far apart.
-It is hard because the prediction at the target node depends on information that starts at a source node and must survive a sequence of message-passing updates.
+A long-range task is not hard merely because two nodes are at large graph distance.
+It is hard because the prediction at the target node depends on information from a source node that must be preserved across a sequence of message-passing layers.
 The relevant dependency has two parts.
-First, the graph must contain a route through which the signal can travel.
-Second, the learned computation must use the signal after it has travelled that route.
+First, the graph must contain a path from the source to the target.
+Second, the learned computation must use the source information through that path.
 The dependency length $d$ measures the graph distance involved, but it does not by itself describe the learning mechanism.
 
 For a candidate explanation to account for long-range failure, it should make a prediction about what goes wrong inside the model.
 An explanation should not only say that accuracy is low.
 It should say what internal quantity changes as $d$ increases and why that change makes the target node unable to use the source node.
 For over-smoothing, the expected internal change is convergence of node representations.
-For over-squashing, it is loss of relevant information when many signals must pass through a narrow part of the graph or a fixed-size node representation.
-For vanishing gradients, it is a training signal that becomes too small in the layers that first process the source node signal.
+For over-squashing, it is loss of relevant information when many signals must be compressed through a narrow part of the graph or a fixed-size node representation.
+For vanishing gradients, it is a training signal that becomes too small in the layers that first process the source information.
 
 This requirement matters because several facts change at the same time when $d$ increases.
-The source node is farther from the target node.
+The source node is at larger graph distance from the target node.
 The model usually needs more message-passing layers.
-The number of intermediate updates grows.
+The number of intermediate message-passing steps grows.
 The distribution of messages at the target node can change.
 The optimization landscape can change as the computation becomes deeper.
 An accuracy curve alone cannot separate these effects.
@@ -74,17 +74,17 @@ If the process continues for many layers, the model can lose the differences tha
 
 In a long-range dependency task, over-smoothing is a natural candidate explanation.
 To use a source node at distance $d$, the target node often needs information to pass through roughly $d$ message-passing layers.
-Adding layers gives the source node signal enough time to reach the target node.
+Adding layers gives the source information enough message-passing steps to affect the target node.
 At the same time, adding layers also gives the network more opportunities to mix node representations until they become hard to distinguish.
 The same depth that makes communication possible can therefore make discrimination harder.
 
 The mechanism can be described without special notation.
-Suppose that two examples should receive different labels because the relevant source node signal differs along their paths.
+Suppose that two examples should receive different labels because the relevant source information differs along their paths.
 If message passing preserves the distinction, their target node representations should differ.
 The final classifier can then separate the labels.
 If over-smoothing occurs, those final node representations move toward the same value.
 The final classifier then sees nearly the same input for examples that require different outputs.
-The model may still be deep enough to transmit messages in graph-distance terms, but the transmitted information is no longer useful for the prediction.
+The model may still be deep enough in graph-distance terms, but the propagated information is no longer useful for the prediction.
 
 The evidence for over-smoothing should therefore be evidence about node representations, not only evidence about accuracy.
 A strong diagnostic would show that node representations collapse as the number of layers or the dependency length $d$ grows.
@@ -121,32 +121,32 @@ One must check whether the node representations actually collapse in the failing
 
 \section{Over-Squashing}
 
-Over-squashing is an information-flow failure.
+Over-squashing is an information-compression failure.
 It occurs when too much information must be compressed into a fixed-size node representation.
 A message-passing model stores what it has learned about a node's neighbourhood in a vector of fixed dimension.
-If many distant nodes can influence the target node, the model may need to carry many signals through a small number of intermediate nodes or edges.
+If many nodes at large graph distance can influence the target node, the model may need to encode many signals through a small number of intermediate nodes or edges.
 Some of those signals can be lost before they reach the target node.
 
 The term is especially natural on graphs with bottlenecks.
-Consider a target node whose label depends on one source node among many distant nodes.
-If all possible source node signals must pass through a narrow route, then the node representation on that route must encode a large amount of information.
-Increasing the dependency length $d$ can make this problem worse when the number of possible paths or relevant distant nodes grows quickly.
-The target node may be reachable from the source node in graph-distance terms, but the route may not have enough informational capacity for the model to preserve the right signal.
+Consider a target node whose label depends on one source node among many nodes at large graph distance.
+If all possible source signals must pass through a narrow path, then the node representation on that path must encode a large amount of information.
+Increasing the dependency length $d$ can make this problem worse when the number of possible paths or relevant nodes at large graph distance grows quickly.
+The target node may be reachable from the source node in graph-distance terms, but the path may not have enough representational capacity for the model to preserve the right signal.
 
 This differs from over-smoothing.
 In over-smoothing, the problem is that node representations become too similar after repeated mixing.
 In over-squashing, the problem is that the model must pack too much distinct information into a bounded representation.
 A model can suffer from over-squashing even if node representations do not all converge.
-The target node representation may retain variation, but the specific source node signal needed for the label may be compressed away.
+The target node representation may retain variation, but the specific source information needed for the label may be compressed away.
 
 The evidence for over-squashing should therefore focus on bottlenecks and information compression.
 A structural diagnostic asks whether many paths, or many possible placements of the relevant source node, must influence the target node through a small cut in the graph.
-A representational diagnostic asks whether increasing the width of node representations or changing the graph to shorten congested routes improves the ability to use the distant source node.
+A representational diagnostic asks whether increasing the width of node representations or changing the graph to shorten congested paths improves the ability to use a source node at large graph distance.
 A causal diagnostic asks whether interventions that reduce the bottleneck restore performance while leaving other parts of the task comparable.
-The common thread is that the evidence should connect the failure to congestion in the flow of information toward the target node.
+The common thread is that the evidence should connect the failure to message-passing bottlenecks toward the target node.
 
 Over-squashing has motivated methods that alter message passing or the graph itself.
-Some approaches add, remove, or reweight edges so that information can travel through shorter or less congested routes.
+Some approaches add, remove, or reweight edges so that message passing can use shorter or less congested paths.
 Others use broader attention patterns, positional information, or rewiring rules that try to reduce the pressure on narrow graph cuts.
 The GLoRa paper groups several evaluated systems according to whether they target over-squashing or related gradient-flow problems \cite{zhou2025glora}.
 These methods are important because they test whether the bottleneck view can lead to better long-range learning.
@@ -157,16 +157,16 @@ As a result, the number of directed paths leading to the target node is small an
 The paper argues that this rules out the particular over-squashing story in which an exponential number of paths is compressed into the target node representation \cite{zhou2025glora}.
 
 The directedness of the construction is important for this argument.
-If the same chain were treated as undirected, messages could move in both directions.
+If the same chain were treated as undirected, message passing could use both edge directions.
 Even a simple chain could then generate many walks that end at the target node as the number of layers grows.
 In that setting, the bounded-path argument would no longer be available.
 The paper explicitly notes this qualification when explaining why over-squashing is not the reason for the main directed GLoRa results \cite{zhou2025glora}.
 
 This does not mean that over-squashing is irrelevant to all GLoRa-like settings or all graph learning tasks.
 It means that the tested failure cannot be explained by the standard bottleneck account without further evidence.
-The source node is distant from the target node, but distance is not the same as congestion.
+The source node is at large graph distance from the target node, but distance is not the same as congestion.
 If there are only a few paths and the relevant signal is intentionally simple, then a performance drop with larger $d$ needs another explanation.
-The model may be failing to preserve the signal through repeated updates, to learn the right local rule, or to optimize a deep composition.
+The model may be failing to preserve the source information through repeated message-passing layers, to learn the right local rule, or to optimize a deep composition.
 Those are different claims from over-squashing.
 
 GLoRa therefore uses over-squashing as a candidate explanation with a clear prediction.
@@ -178,8 +178,8 @@ The observed failure remains, so over-squashing is not a complete explanation fo
 
 Vanishing gradients are an optimization failure.
 They occur when the gradient of the loss becomes very small as it is propagated backward through a deep computation.
-In a message-passing graph neural network, a prediction at the target node may depend on updates many layers earlier.
-If the gradient reaching those early layers is close to zero, the model may not learn how to transform the source node signal before it starts travelling toward the target node.
+In a message-passing graph neural network, a prediction at the target node may depend on earlier message-passing layers.
+If the gradient reaching those early layers is close to zero, the model may not learn how to transform the source information before it is propagated toward the target node.
 
 The mechanism is not specific to graphs.
 Deep neural networks are trained by backpropagation, which uses the chain rule.
@@ -188,11 +188,11 @@ If this happens consistently, early parameters receive weak updates.
 The network may then train slowly or stop improving in the parts of the computation that matter for long-range dependencies \cite{glorot2010difficulty}.
 
 Graphs add a message-passing interpretation to this familiar problem.
-For a dependency of length $d$, the source node signal must be processed and passed through a sequence of layers before it can affect the target node prediction.
+For a dependency of length $d$, the source information must be processed and propagated through a sequence of layers before it can affect the target node prediction.
 The loss is computed at the output.
-The gradient must then travel back through the classifier, through the target node updates, and through the intermediate message-passing layers.
-If this backward signal decays with depth, the parameters that first handle the source node signal may learn too little.
-The forward computation may have a path from the source node to the target node, but the training process may not teach that path to carry the right information.
+The gradient must then backpropagate through the classifier, through the target node updates, and through the intermediate message-passing layers.
+If this backward signal decays with depth, the parameters that first handle the source information may learn too little.
+The forward computation may have a path from the source node to the target node, but the training process may not teach the model to preserve source information along that path.
 
 The evidence for vanishing gradients should be evidence about training dynamics.
 A direct diagnostic measures gradient norms in early layers as the dependency length $d$ or the number of message-passing layers increases.
@@ -215,7 +215,7 @@ The systems still fail at larger dependency lengths, which means the cause must 
 At the same time, the diagnostic should be read carefully.
 Stable weight gradients show that training signals exist, but they do not prove that the gradients point toward the right solution.
 A model can receive gradients and still learn a poor rule.
-Gradients can also be large for parameters that do not preserve the source node signal.
+Gradients can also be large for parameters that do not preserve the source information.
 Thus, the absence of vanishing gradients rules out one broad optimization story, but it does not identify the positive mechanism behind the failure.
 It narrows the explanation rather than finishing it.
 
@@ -233,22 +233,22 @@ They are not mutually exclusive categories.
 
 Over-smoothing and over-squashing can reinforce each other.
 When many messages are mixed at each layer, the target node representation may both lose differences between nodes and discard details from a particular source node.
-The result can look like a smooth representation space in which the relevant source node signal is no longer recoverable.
+The result can look like a smooth representation space in which the relevant source information is no longer recoverable.
 In such a case, a method that only increases representation width may not help if repeated mixing still washes out distinctions.
-Likewise, a method that only preserves differences between nodes may not help if the graph still forces many signals through a narrow route.
+Likewise, a method that only preserves differences between nodes may not help if the graph still forces many signals to be compressed through a narrow path.
 
 Vanishing gradients can also interact with the two forward failures.
 If gradients become too small in early layers, the model may never learn transformations that resist over-smoothing.
 It may also fail to learn which information should be prioritized when a bottleneck is unavoidable.
-Conversely, if forward message passing already destroys the source node signal, then healthy gradient magnitudes do not guarantee success.
+Conversely, if forward message passing already destroys the source information, then healthy gradient magnitudes do not guarantee success.
 The optimizer can update parameters, but it may still not find a computation that keeps the right information available at the target node.
 
 These interactions matter for interpreting architectures.
 A residual connection may help gradient flow and also preserve earlier node representations.
 A normalization method may stabilize training and also change how strongly node representations mix.
 A rewiring method may reduce over-squashing and also shorten the effective dependency length $d$.
-A gated message-passing system may help because it controls which information is transmitted, not because it fits neatly into only one of the three explanation categories.
-The GLoRa paper observes that the best-performing systems in the main experiments use gated edges, which suggests that controlled transmission may be useful, but it does not by itself identify a final mechanism \cite{zhou2025glora}.
+A gated message-passing system may help because it controls which messages are propagated, not because it fits neatly into only one of the three explanation categories.
+The GLoRa paper observes that the best-performing systems in the main experiments use gated edges, which suggests that controlled message propagation may be useful, but it does not by itself identify a final mechanism \cite{zhou2025glora}.
 
 The interaction between explanations is one reason that diagnostic evidence must be precise.
 If a model improves after adding residual connections, the improvement could come from better gradient flow, less representational collapse, easier optimization, or a changed inductive bias.
@@ -263,16 +263,16 @@ It says that the learned function no longer fits the benchmark as the required s
 Several mechanisms can produce the same curve, and the curve alone does not identify which one occurred.
 
 The problem is a form of non-identifiability.
-When $d$ increases, the benchmark asks the model to use information that travels farther.
+When $d$ increases, the benchmark asks the model to use information across larger graph distances.
 In many experiments, the number of message-passing layers also increases so that the receptive field is large enough.
-The computation becomes deeper, the source node signal passes through more intermediate updates, and the target node aggregates messages after more rounds of mixing.
+The computation becomes deeper, the source information is processed by more intermediate message-passing layers, and the target node aggregates messages after more rounds of mixing.
 Training must also optimize a longer chain of transformations.
 If accuracy drops, any of these changes could be responsible.
 
 Over-smoothing predicts one trace.
 The target node representations for different labels should become too similar.
 Over-squashing predicts another trace.
-The graph or computation should force too many relevant signals through a narrow channel.
+The graph or computation should force too many relevant signals to be compressed through a narrow channel.
 Vanishing gradients predict a third trace.
 The gradients needed to train early message-passing layers should shrink toward zero.
 A single accuracy number has none of this information.
@@ -303,7 +303,7 @@ It is that these three broad accounts have not identified the cause.
 The model may fail because it does not learn the intended algorithmic rule.
 It may fail because the inductive bias of message passing does not favour the required composition.
 It may fail because optimization finds a shortcut that works for shorter dependencies but does not extrapolate.
-It may fail because the source node signal is transformed in a way that remains variable but not label-useful.
+It may fail because the source information is transformed in a way that remains variable but is no longer useful for label prediction.
 These possibilities require further diagnostics.
 They cannot be read directly from the accuracy curve.
 
