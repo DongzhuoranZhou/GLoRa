@@ -2,18 +2,18 @@
 
 \section{Purpose of the Chapter}
 
-Graph learning starts from a simple difficulty: the input is not a fixed-length vector, but a structured object with nodes, edges, and features.
-The order in which the nodes are stored in memory should not change the answer.
-The number of nodes may also change from one example to the next.
-The chapter introduces the notation and model class used throughout the thesis to handle this setting.
+Graph learning starts from a simple constraint: the input is a structured object with nodes, edges, and features, not a fixed-length vector.
+The order in which nodes are stored in memory should not affect the answer, and the number of nodes may change from one example to the next.
+The notation and model class used throughout the thesis must respect this structure.
 
-The chapter focuses on message-passing graph neural networks because they are the standard reference point for long-range graph learning \cite{scarselli2008graph}.
-Message passing gives a model a strong local bias: a node first receives information from its neighbours, then information from nodes farther away can arrive only after more layers.
-This bias explains why graph neural networks can share parameters across graphs of different sizes.
-It also explains why long-range dependency learning becomes a meaningful and difficult evaluation problem.
+The focus is message-passing graph neural networks, the standard reference point for long-range graph learning \cite{scarselli2008graph}.
+Message passing gives a model a local bias.
+A node first receives information from its neighbours; information from farther nodes can arrive only after more layers.
+This locality explains why GNNs can share parameters across graphs of different sizes, and it is also what makes dependency length an evaluation problem.
 
 The notation follows the GLoRa paper closely.
-A graph is written as $G=(V,E,\lambda)$, where $V$ is a finite set of nodes, $E\subseteq V\times V$ is a set of directed edges, and $\lambda:V\to\mathbb{R}^n$ maps each node to a feature vector.
+A graph is written as $G=(V,E,\lambda)$.
+Here $V$ is a finite set of nodes, $E\subseteq V\times V$ is a set of directed edges, and $\lambda:V\to\mathbb{R}^n$ maps each node to a feature vector.
 Nodes are denoted by $u,v\in V$.
 An edge $(u,v)\in E$ points from $u$ to $v$.
 The incoming neighbourhood of $v$ is
@@ -55,7 +55,8 @@ In a molecular graph, a node feature may encode atom type, while an edge feature
 The model must combine both kinds of information without depending on an arbitrary ordering of the nodes or edges.
 
 Paths provide the basic language for distance.
-A directed path from $u$ to $v$ of length $d$ is a sequence $v_0,\ldots,v_d$ of nodes such that $v_0=u$, $v_d=v$, and $(v_{i-1},v_i)\in E$ for each $i$ with $1\leq i\leq d$.
+A directed path from $u$ to $v$ of length $d$ is a sequence $v_0,\ldots,v_d$ of nodes.
+It satisfies $v_0=u$, $v_d=v$, and $(v_{i-1},v_i)\in E$ for each $i$ with $1\leq i\leq d$.
 The distance from $u$ to $v$ is the smallest such length $d$, when such a path exists.
 This direction matters for message passing.
 If messages travel along incoming edges into a target node $v$, then information from $u$ can reach $v$ only when there is a directed path from $u$ to $v$.
@@ -95,10 +96,10 @@ Each example may be a pair $(G,v)$ consisting of a graph and a target node.
 Graph classification is naturally inductive when the training and test sets contain different graphs.
 The GLoRa paper focuses on inductive binary node classification, where each example has a graph, a target node, and a binary label \cite{zhou2025glora}.
 
-The inductive setting is stricter in one important sense.
-The model cannot solve the task by memorizing the identities of nodes in a single graph.
+The inductive setting is stricter in one respect.
+The model cannot solve the task by memorizing node identities in a single graph.
 It must learn a rule that applies across graph instances.
-This is the setting in which permutation equivariance and shared local computation become especially important.
+Permutation equivariance and shared local computation matter most in this setting.
 
 \section{Message-Passing Graph Neural Networks}
 
@@ -174,7 +175,7 @@ and
 The hidden state $h_v^{(\ell)}$ is a function only of the graph induced by this receptive field, the features inside it, and the parameters of the first $\ell$ layers.
 This statement follows by induction from the layer equations.
 
-The locality property gives message passing a clear interpretation.
+Locality gives message passing a clear interpretation.
 Each layer increases the maximum path length through which information can travel by one.
 If a node $u$ is at distance $d$ from $v$ and the model has fewer than $d$ local message-passing layers, then the hidden state of $v$ cannot depend on $\lambda(u)$.
 This is not a training problem.
@@ -186,11 +187,10 @@ The signal may be weakened by repeated transformations, mixed with other signals
 Later chapters discuss over-smoothing, over-squashing, and vanishing gradients as possible explanations for such failures.
 For the present chapter, the key point is simpler: message passing makes distance operational.
 
-This operational view is why dependency length is meaningful for GNN evaluation.
+This operational view makes dependency length meaningful for GNN evaluation.
 A task has a dependency of length $d$ when the correct prediction at a target node depends on information that must travel along a path of length $d$.
 The GLoRa paper formalizes a path-aware version of this idea and uses it to construct benchmark examples \cite{zhou2025glora}.
-The benchmark question is therefore not only whether a model reaches high accuracy.
-It is whether the model has learned the function that uses the intended path.
+The benchmark question is therefore not only whether a model reaches high accuracy, but whether the learned function uses the intended path.
 
 \section{Permutation Equivariance and Invariance}
 
@@ -328,7 +328,7 @@ Two benchmark design errors can break this claim in opposite ways.
 The GLoRa paper is motivated by avoiding both errors \cite{zhou2025glora}.
 
 The first error is a shortcut target.
-Here the benchmark examples are generated from a rule that involves a long path, but the finite dataset can also be fitted by another rule that does not use that path.
+The benchmark examples may be generated from a rule that involves a long path, while the finite dataset can also be fitted by another rule that does not use that path.
 A model that learns the shortcut may obtain high accuracy.
 The score then fails to show that the model learned the intended dependency.
 This is especially dangerous when the shortcut is easier for the architecture than the long-range rule.
@@ -340,18 +340,15 @@ If only one class contains a certain kind of local neighbourhood, a shallow GNN 
 The benchmark may look long-range by construction while rewarding a short-range or graph-level statistic.
 
 The second error is an inexpressible target.
-Here the intended rule really does require a long-range dependency, but the evaluated model class cannot represent the rule even in principle.
+The intended rule may genuinely require a long-range dependency, while the evaluated model class cannot represent that rule even in principle.
 Low accuracy then does not reveal a failure to learn long-range dependencies.
 It may only reveal that the benchmark asked the model to compute a function outside its expressive power.
 This is a serious problem when the benchmark is used to compare methods.
 A method should not be penalized for failing a task that no model in its class could express.
 
 These two errors make benchmark interpretation fragile.
-High accuracy is uninformative when shortcuts exist.
-Low accuracy is uninformative when the intended function is inexpressible.
-A long-range benchmark must therefore satisfy two conditions at the same time.
-It should force any fitting function to rely on the intended dependency length.
-It should also make the intended function expressible by the model families under study.
+High accuracy is uninformative when shortcuts exist, and low accuracy is uninformative when the intended function is inexpressible.
+A long-range benchmark must therefore satisfy two conditions at once: it should force any fitting function to rely on the intended dependency length, and it should keep the intended function expressible by the model families under study.
 
 This requirement explains why the message-passing formalism matters for evaluation.
 The benchmark target must be written with the model class in mind.
@@ -361,19 +358,20 @@ Otherwise, better accuracy may reflect a shortcut, a different communication rou
 
 GLoRa addresses this tension by generating examples for a chosen dependency length.
 The positive and negative cases are designed so that fitting enough examples requires sensitivity to the nodes along a path of that length.
-At the same time, the intended function remains expressible by standard GNN-based systems when the architecture has enough capacity and depth \cite{zhou2025glora,barcelo2020logical}.
-The benchmark can therefore ask a sharper question than ordinary accuracy comparisons.
-It asks how long a dependency a system can learn before its performance collapses.
+The intended function nevertheless remains expressible by standard GNN-based systems when the architecture has enough capacity and depth \cite{zhou2025glora,barcelo2020logical}.
+The benchmark can therefore ask more than whether a system is accurate.
+It asks how long a dependency the system can learn before performance collapses.
 
 \section{Chapter Summary}
 
-The chapter has introduced the graph notation used in the thesis.
-A graph is $G=(V,E,\lambda)$, directed edges are written $(u,v)\in E$, node features are given by $\lambda:V\to\mathbb{R}^n$, and the incoming neighbourhood of $v$ is $N(v)=\{u\mid (u,v)\in E\}$.
+The notation used in the thesis is now fixed.
+A graph is $G=(V,E,\lambda)$.
+Directed edges are written $(u,v)\in E$, node features are given by $\lambda:V\to\mathbb{R}^n$, and the incoming neighbourhood of $v$ is $N(v)=\{u\mid (u,v)\in E\}$.
 Message-passing GNNs set $h_v^{(0)}=\lambda(v)$ and update hidden states layer by layer through neighbourhood aggregation and node-wise combination.
 The layer index is $\ell$, and the hidden state of node $v$ at layer $\ell$ is $h_v^{(\ell)}$.
 
-The chapter also explained why this formalism is local, permutation equivariant at node level, and permutation invariant after a graph-level readout.
+The same formalism is local, permutation equivariant at node level, and permutation invariant after a graph-level readout.
 After $\ell$ layers, a node can depend only on information in its $\ell$-layer receptive field.
-This makes path distance and dependency length central to the evaluation of graph learning systems.
-It also shows why a benchmark for long-range dependency learning must control both shortcut functions and expressibility.
+Path distance and dependency length are therefore central to the evaluation of graph learning systems.
+A benchmark for long-range dependency learning must control both shortcut functions and expressibility.
 Without those controls, a benchmark score cannot show whether the system learned the intended graph dependency.

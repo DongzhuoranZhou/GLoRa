@@ -1,15 +1,15 @@
 \chapter{The GLoRa Contribution}
 \label{chap:glora-contribution}
 
-The chapter explains the contribution of GLoRa at the level of the thesis.
+GLoRa is the methodological core of the thesis.
 The included paper introduces GLoRa as a benchmark generator for testing whether a graph learning system can learn dependencies of a specified length \cite{zhou2025glora}.
-The contribution is not only a new synthetic dataset.
-It is a way to make a sharper evaluation claim.
-If a model performs well on a usual graph benchmark, the score may show that the model has found a predictive pattern, but it does not by itself show that the model has used the intended long-range graph dependency.
+The contribution is not only a new synthetic dataset, but a way to make a sharper evaluation claim.
+A usual graph benchmark can show that a model has found a predictive pattern.
+It does not by itself show that the model used the intended long-range graph dependency.
 GLoRa is designed to close this gap.
 For a chosen dependency length $d$, it generates balanced node-classification examples whose labels are tied to a path condition, while adding enough random structure to rule out simpler fitting functions.
 
-The chapter is organized around the design problem that GLoRa solves.
+The argument is organized around the design problem that GLoRa solves.
 Section~\ref{sec:glora-motivation} explains why benchmark design matters for long-range graph learning.
 Section~\ref{sec:glora-path-aware} fixes the notation and describes the path-aware notion of dependency used by the paper.
 Sections~\ref{sec:glora-design} and~\ref{sec:glora-shortcuts} explain the generator and the shortcut problem it is meant to avoid.
@@ -31,16 +31,15 @@ Before deciding which architecture is best, one must know what the benchmark sco
 The central evaluation question is:
 given a length $d$, has the system learned a function whose prediction for a target node genuinely depends on information carried along a path of length $d$?
 This question is stronger than asking whether a system has high accuracy on a dataset whose labels were generated from a long-range rule.
-The reason is that a dataset can have more than one fitting function.
-One function may use the intended long path, while another may exploit a local count, a global graph statistic, a source-node marker, or some artifact of how positive and negative examples were generated.
+A dataset can have more than one fitting function.
+One function may use the intended long path, while another may exploit a local count, a global graph statistic, a source-node marker, or an artifact of how positive and negative examples were generated.
 If both functions fit the examples, high test accuracy does not distinguish a model that learned the long-range dependency from a model that learned the shortcut.
 
 Real-world benchmarks are important because they represent practical tasks, but they are weak evidence for this particular claim.
 Their target functions are not fully controlled.
-Even when domain knowledge suggests that a task should involve long-range interactions, the benchmark may contain local correlations that are sufficient for prediction.
-This does not make the benchmark useless.
-It means that the benchmark mainly supports comparative claims: one model performs better than another on this dataset.
-It does not certify that a model can learn dependencies of a specified graph distance.
+Even when domain knowledge suggests that a task should involve long-range interactions, the benchmark may contain local correlations sufficient for prediction.
+Such a benchmark can still support comparative claims, for example that one model performs better than another on the same dataset.
+It cannot certify by itself that a model can learn dependencies of a specified graph distance.
 The Long Range Graph Benchmark and related real-world benchmarks are valuable in this comparative sense, but their labels do not provide formal control over the dependency that a learned function must use \cite{dwivedi2022long,zhou2025glora}.
 
 Synthetic benchmarks offer more control, but only if they are designed with care.
@@ -198,7 +197,7 @@ These shortcuts are not implementation details.
 They decide what conclusion can be drawn from the benchmark score.
 
 Appendix~D of the paper uses this lens to examine existing synthetic benchmarks \cite{zhou2025glora}.
-The point is not that those benchmarks are badly designed for every purpose.
+The criticism is not that those benchmarks are badly designed for every purpose.
 It is that they do not certify the particular claim GLoRa is designed to test.
 Synthetic Chains, Graph Transfer, Ring Transfer, and Tree-Neighbours all contain long-range generative rules, but they also admit fitting functions that do not rely on the intended path-aware dependency.
 h-Proximity has a related issue: a fitting function can avoid depending on the features along the paths between relevant nodes and the target.
@@ -222,7 +221,7 @@ The first error is to make the task too easy by leaving a shortcut.
 The second error is to make the task impossible for the evaluated model class.
 If no model in the class can express the target function, poor performance says little about long-range learning.
 It may only show that the benchmark asks for a function outside the model's representational power.
-This is why GLoRa treats expressibility as part of the benchmark design.
+GLoRa therefore treats expressibility as part of the benchmark design.
 
 The paper states three intended properties.
 Property (P1) says that all node-classification functions fitting sufficiently many generated examples rely on a dependency of length $d$, with arbitrarily high precision and probability.
@@ -293,14 +292,12 @@ This is consistent with the benchmark's design: the task becomes longer-range wi
 The main empirical result is negative but informative.
 Many systems fail as $d$ grows, and most show a clear performance drop before $d$ reaches 9.
 Some systems perform better than others, but even the best systems perform poorly after $d=11$.
-The paper therefore concludes that none of the evaluated systems can reliably claim to learn substantially long dependencies under the GLoRa test \cite{zhou2025glora}.
+The paper therefore concludes that the evaluated systems do not provide reliable evidence of learning the larger dependency lengths tested by GLoRa \cite{zhou2025glora}.
 
 The best-performing systems are the ones that use gated edges, especially GatedGCN and gated variants such as DenseGatedGCN and ResGatedGCN.
-This does not solve the problem, but it is a useful signal.
 Gating may help preserve or regulate information as it moves along a path.
-The result suggests that mechanisms of this kind are worth studying as part of future long-range graph learning architectures.
-At the same time, the GLoRa results show that gated edges are not enough by themselves.
-The performance still degrades at modest dependency lengths.
+The result points to a plausible architectural direction, but it does not solve the problem.
+Even with gated edges, performance still degrades at modest dependency lengths.
 
 The transformer-based systems do not dominate the benchmark.
 This is important because graph transformers change the communication pattern more radically than ordinary message passing.
@@ -315,7 +312,7 @@ On GLoRa, however, improving the known failure mode does not automatically produ
 This does not mean that the methods are unhelpful.
 It means that the benchmark exposes an additional question: even when a model avoids a familiar pathology, can it learn the path-aware function required by the task?
 
-The most important lesson is therefore methodological.
+The most important lesson is methodological.
 A benchmark score should be interpreted together with the dependency that the benchmark certifies.
 On GLoRa, high accuracy at length $d$ would be evidence that the system has learned a fitting function that depends on a path of length $d$.
 Low accuracy shows that the system did not learn such a function under the experimental protocol.
@@ -341,7 +338,7 @@ At $d=6$, the values for positive and negative examples are clearly separated.
 At $d=13$, the values are mixed, as expected from poor accuracy.
 However, they do not collapse to a single value and still have substantial standard deviation.
 The representations are confused, but not smoothed into indistinguishability.
-This is why the paper argues that over-smoothing is not the observed reason for failure.
+The paper therefore argues that over-smoothing is not the observed reason for failure.
 
 \subsection{Over-squashing}
 
@@ -382,20 +379,19 @@ GLoRa contributes to this thesis in two ways.
 First, it gives a benchmark generator for controlled long-range dependency evaluation.
 For each chosen $d$, it creates examples that target a source-to-target path condition and are designed to rule out shortcut fitting functions.
 Second, it changes how benchmark results should be read.
-The result of a GLoRa experiment is not only an accuracy number.
-It is evidence about the length of path-aware dependency that a system can learn under controlled conditions.
+The result of a GLoRa experiment is not only an accuracy number; it is evidence about the length of path-aware dependency that a system can learn under controlled conditions.
 
-The contribution is therefore methodological as much as empirical.
-The empirical result is that a broad set of state-of-the-art systems fails beyond modest lengths.
-The methodological result is that this failure can be stated more precisely than before.
+The contribution is methodological as much as empirical.
+Empirically, a broad set of state-of-the-art systems fails beyond modest lengths.
+Methodologically, this failure can be stated more precisely than before.
 The systems do not merely perform poorly on another synthetic dataset.
 They fail on a dataset whose design ties successful fitting to a dependency of specified length, while keeping the intended function expressible.
-This is why the negative result is meaningful.
+That is why the negative result is meaningful.
 
 The diagnostic result further sharpens the research problem.
 If the diagnostics do not support over-smoothing, over-squashing, or vanishing gradients as explanations for the observed degradation, then long-range graph learning cannot be reduced to those three labels.
 They remain important phenomena, and they may explain failures in other settings.
-But GLoRa shows that there is a residual problem: even when the usual explanations are controlled or absent, current systems may still not learn the intended long-range dependency.
+GLoRa leaves a residual problem: even when the usual explanations are controlled or absent, current systems may still not learn the intended long-range dependency.
 This motivates future work on more precise diagnostics, better inductive biases for path conditions, and architectures that preserve the right kind of information over distance.
 
 For the thesis, the central point is that evaluation and modeling are inseparable.

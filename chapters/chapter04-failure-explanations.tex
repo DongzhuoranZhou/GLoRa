@@ -6,8 +6,8 @@ After one layer, the target node can use information from its immediate neighbou
 After two layers, it can use information that has travelled through two edges.
 In the idealized picture, $d$ layers are enough for a signal from a source node at distance $d$ to reach the target node.
 
-This idealized picture is useful, but it is not a complete account of learning.
-A signal being reachable by message passing does not mean that the trained model will use it.
+This idealized picture is useful, but reachability is not the same as learning.
+A signal may be reachable by message passing without being used by the trained model.
 The model must preserve the right information as messages move along the graph.
 It must have enough capacity to keep the relevant signal separate from irrelevant signals.
 It must also receive gradients that make the earlier layers learn the transformations needed for the final prediction.
@@ -20,12 +20,13 @@ Over-squashing says that too much information is compressed into a fixed-size no
 Vanishing gradients say that the training signal becomes too small to teach early layers what to preserve.
 Each mechanism is plausible in a deep message-passing model, and each has motivated architectural changes in graph learning \cite{zhou2025glora}.
 
-The chapter treats these mechanisms as candidate explanations, not as automatic diagnoses.
-That distinction is important for the thesis.
+This chapter treats these mechanisms as candidate explanations, not as automatic diagnoses.
+The distinction matters for the thesis.
 The included GLoRa paper studies tasks where the dependency length $d$ is controlled by construction.
-The experiments show that many graph learning systems fail as $d$ grows, even though the intended dependency is expressible by standard message-passing systems and the number of layers is set large enough for the source node signal to reach the target node \cite{zhou2025glora}.
+The experiments show that many graph learning systems fail as $d$ grows.
+This happens even though the intended dependency is expressible by standard message-passing systems and the number of layers is set large enough for the source node signal to reach the target node \cite{zhou2025glora}.
 The paper then asks whether the observed failure can be attributed to over-smoothing, over-squashing, or vanishing gradients.
-Its answer is negative for the tested setting.
+Its diagnostics do not support those explanations in the tested setting.
 This does not make the three phenomena unimportant.
 It shows that a long-range performance drop is a symptom whose cause must be checked rather than assumed.
 
@@ -59,8 +60,8 @@ It first constructs benchmarks where the intended solution requires a dependency
 It then evaluates systems on increasing values of $d$.
 Finally, it checks whether the standard explanations leave the traces they should leave if they were the reason for the drop \cite{zhou2025glora}.
 This structure is a useful model for the rest of the thesis.
-The point is not to deny the value of the standard explanations.
-The point is to connect each explanation to evidence.
+It does not deny the value of the standard explanations.
+It connects each explanation to evidence.
 
 \section{Over-Smoothing}
 
@@ -112,7 +113,7 @@ It does not show that over-smoothing is irrelevant to all long-range graph tasks
 It shows that, in the tested GLoRa setting and for the inspected systems, the observed accuracy drop is not accompanied by the representational convergence that an over-smoothing explanation would predict.
 The model fails, but the final target node representations have not become indistinguishable in the over-smoothing sense.
 
-This is why GLoRa treats over-smoothing as a candidate explanation rather than a complete explanation.
+GLoRa therefore treats over-smoothing as a candidate explanation rather than a complete explanation.
 The phenomenon is real and well motivated.
 It explains one way that deep message passing can destroy task-relevant distinctions.
 But the existence of a deep message-passing model and a large dependency length $d$ is not enough to infer over-smoothing.
@@ -258,17 +259,14 @@ The mechanism still needs to be tested.
 \section{Why a Drop with Increasing Dependency Length Is Not a Diagnosis}
 
 A performance drop with increasing dependency length $d$ is the starting observation, not the explanation.
-It says that the model's learned function no longer fits the benchmark as the required source node to target node dependency becomes longer.
-Several mechanisms can produce the same curve.
-The curve does not tell us which one occurred.
+It says that the learned function no longer fits the benchmark as the required source-to-target dependency becomes longer.
+Several mechanisms can produce the same curve, and the curve alone does not identify which one occurred.
 
 The problem is a form of non-identifiability.
 When $d$ increases, the benchmark asks the model to use information that travels farther.
-In many experiments, the number of message-passing layers also increases so that the model has enough receptive field.
-The computation is deeper.
-The source node signal passes through more intermediate updates.
-The target node aggregates messages after more rounds of mixing.
-Training also has to optimize a longer chain of transformations.
+In many experiments, the number of message-passing layers also increases so that the receptive field is large enough.
+The computation becomes deeper, the source node signal passes through more intermediate updates, and the target node aggregates messages after more rounds of mixing.
+Training must also optimize a longer chain of transformations.
 If accuracy drops, any of these changes could be responsible.
 
 Over-smoothing predicts one trace.
@@ -286,22 +284,22 @@ That result suggests that the method is useful, but it does not prove that the v
 The method may also change optimization, effective depth, normalization, parameter count, or the way messages are combined.
 Similarly, if a rewiring method helps, the reason may be over-squashing, but it may also be that the method has shortened the dependency length that the model actually needs to learn.
 
-This is why GLoRa's conclusion is methodological.
+GLoRa's conclusion is therefore methodological.
 The paper does not stop after showing that accuracy falls with increasing $d$.
 It asks whether the usual explanations make predictions that are visible in the failing runs.
 For over-smoothing, the paper checks whether the final target node representations collapse.
 For over-squashing, it checks whether the directed construction creates the kind of path explosion required by the bottleneck story.
 For vanishing gradients, it checks whether gradients in the inspected layers vanish during training \cite{zhou2025glora}.
-The answer is negative in each case for the main setting.
+In the main setting, the measured traces do not match these explanations.
 
-This negative result is informative because it prevents a common shortcut in interpretation.
+This result prevents a common shortcut in interpretation.
 It is tempting to see a long-range failure and immediately name one of the standard phenomena.
 The name gives the result a familiar shape, but it can also hide the fact that the evidence has not been checked.
 In the GLoRa experiments, the familiar names do not fully account for the observations.
 The systems fail at larger $d$, but the measured node representations, graph construction, and gradients do not match the simple versions of the three explanations.
 
-The right conclusion is therefore not that the performance drop has no cause.
-It is that the cause has not been identified by these three broad accounts.
+The right conclusion is not that the performance drop has no cause.
+It is that these three broad accounts have not identified the cause.
 The model may fail because it does not learn the intended algorithmic rule.
 It may fail because the inductive bias of message passing does not favour the required composition.
 It may fail because optimization finds a shortcut that works for shorter dependencies but does not extrapolate.
@@ -312,24 +310,23 @@ They cannot be read directly from the accuracy curve.
 \section{The Role of GLoRa in the Explanation}
 
 GLoRa is useful in this thesis because it separates two questions that are often blurred.
-The first question is whether a graph learning system performs well on a benchmark.
-The second question is whether that performance certifies learning a dependency of length $d$.
+One question is whether a graph learning system performs well on a benchmark.
+Another is whether that performance certifies learning a dependency of length $d$.
 The benchmark is designed so that fitting enough examples requires using the intended long-range dependency, while the intended function remains expressible by standard GNN-based systems \cite{zhou2025glora,barcelo2020logical}.
 
 This design makes failures easier to interpret, but it does not automatically explain them.
 When a system fails on GLoRa at larger $d$, the benchmark tells us that the system did not learn the required dependency reliably.
 It does not tell us whether the reason is representational collapse, information bottlenecking, weak gradients, or another mechanism.
-The diagnostic part of the paper is therefore essential.
-It turns the standard explanations into testable hypotheses.
+The diagnostic part of the paper is essential because it turns the standard explanations into testable hypotheses.
 
 The tests leave GLoRa with a restrained conclusion.
-The observed degradation in the main experiments cannot be cleanly attributed to over-smoothing, over-squashing, or vanishing gradients.
-This is a stronger claim than saying that the systems are inaccurate, and a weaker claim than saying that the true cause is known.
+The diagnostics do not support attributing the observed degradation in the main experiments to over-smoothing, over-squashing, or vanishing gradients.
+This claim is stronger than saying that the systems are inaccurate, but weaker than identifying the true cause.
 It says that the common explanations do not match the evidence available in the tested setting.
 
-For the rest of the thesis, this restrained conclusion is the useful one.
+This restrained conclusion is the one needed for the rest of the thesis.
 Over-smoothing, over-squashing, and vanishing gradients remain central concepts in long-range graph learning.
 They explain real risks in deep message passing and organize much of the state of the art.
-At the same time, GLoRa shows that they should be used as diagnoses only when their predicted traces are present.
+GLoRa shows that they should be used as diagnoses only when their predicted traces are present.
 The long-range problem is broader than any one of them.
 Understanding it requires benchmarks that control the dependency length $d$ and diagnostics that connect failures to mechanisms.
