@@ -10,3 +10,5 @@ output/
 *.toc
 main.pdf
 *.synctex.gz
+drafts/
+notes/thesis-expansion-plan.md
