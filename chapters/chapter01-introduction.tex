@@ -1,19 +1,23 @@
 \chapter{Introduction}
 
+This thesis studies how graph learning systems learn dependencies between a target node and information at larger graph distance.
+It focuses on GLoRa, a benchmark generator that tests whether a model can learn a specified long-range dependency in node classification rather than an easier shortcut.
+This chapter introduces the graph learning setting, explains why message-passing graph neural networks make dependency length a central issue, and states how the thesis uses GLoRa to study evaluation for long-range dependency learning.
+
 Graphs represent entities together with the relations that connect them.
 They appear in molecular structures, web links, recommendation systems, road networks, financial transactions, and many other domains where the object of interest is not independent of its context.
-A prediction about one node may depend on nearby nodes, on a wider neighbourhood, or on a particular path that spans many hops in the graph.
+A prediction about a target node may depend on nearby nodes, on a wider neighbourhood, or on a source node connected through a path that spans many hops in the graph.
 
 Graph neural networks (GNNs) are a central family of models for learning from this kind of data \cite{scarselli2008graph}.
-Their usual design is based on message passing.
-At each layer, a node receives information from its neighbours, combines that information with its current representation, and passes the result to the next layer.
+Most GNNs use message passing.
+At each layer, a node aggregates information from its one-hop neighbourhood, combines that information with its current representation, and produces a new node representation for the next layer.
 After one layer, a node can use information from its immediate neighbours.
 After several layers, it can use information from nodes at larger graph distance.
 
-This message-passing update rule is one of the main strengths of GNNs.
+This repeated one-hop neighbourhood aggregation is one of the main strengths of GNNs.
 It lets a model process graphs of different sizes, reuse parameters across the graph, and respect the fact that the order of nodes in memory should not change the answer.
-The same rule also creates the central difficulty studied here.
-If the correct prediction for a node depends on information at large graph distance, that information must be preserved across many message-passing layers before it can affect the final prediction.
+The same design also creates the central difficulty studied here.
+If the correct prediction for a target node depends on information at large graph distance, that information must be preserved across many message-passing layers before it can affect the final prediction.
 
 The thesis studies this difficulty through benchmark design.
 A high score on a graph dataset is useful only after one knows what the score certifies.
@@ -30,7 +34,10 @@ It then argues that evaluation is part of the technical problem, states the rese
 
 \section{Why Graph Learning Matters}
 
-Many important machine learning problems are relational.
+This section explains why graph learning matters for this thesis: many prediction problems depend on relations between objects rather than isolated features.
+These domains motivate GNNs because the model must build node representations from graph structure.
+They also motivate GLoRa because relevant information can lie beyond the target node's one-hop neighbourhood, which makes long-range dependency learning a general requirement rather than a special property of one benchmark.
+
 In a molecule, the behaviour of one atom depends on the structure in which it is embedded.
 In a social network, a user's behaviour may depend on nearby users, on communities at larger graph distance, or on chains of influence that pass through several intermediaries.
 In a traffic network, congestion at one location may depend on roads and intersections that are not adjacent to it.
@@ -53,16 +60,17 @@ Urban prediction tasks use graph structure to model traffic and air quality over
 Internet safety and finance include tasks such as fake news detection and anti-money laundering, where relevant signals may only appear through multi-step patterns \cite{han2020fake,weber2018aml}.
 Biochemical tasks include protein interaction and drug side-effect prediction, where properties can depend on structures that are not local in the graph \cite{jha2022protein,bongini2022drugnn}.
 
-These domains do not all require the same model or the same definition of distance.
+These domains do not all require the same model or the same definition of graph distance.
 They do show that learning from graphs often means learning from relations that extend beyond immediate neighbours.
 For this reason, the ability to use information at large graph distance is an important part of what graph learning systems are expected to do.
-It is also an ability that is difficult to measure directly.
+It is also an ability that is difficult to measure directly, which is why GLoRa treats dependency length as an explicit benchmark variable.
 
 \section{Long-Range Dependencies in Graphs}
 
-At a high level, a prediction has a long-range dependency when the correct answer depends on information at large graph distance from the prediction target.
+This section defines the graph-learning issue that GLoRa tests: a target prediction has a long-range dependency when its correct label depends on information at large graph distance.
+The definition matters because GLoRa varies dependency length explicitly and asks whether systems learn the intended path-aware dependency rather than a local or global shortcut.
 In node classification, the target is a node, and the relevant information may lie several hops away.
-The prediction may depend not only on the source node itself, but also on the path, pattern, or interaction that connects it to the target.
+The prediction may depend not only on the source node itself, but also on the path, pattern, or interaction that connects it to the target node.
 
 Graph distance is the basic way to speak about range in this thesis.
 If the source information is at graph distance $d$ from the target node, a local message-passing GNN needs at least $d$ layers before that information can affect the target representation through one-hop neighbourhood aggregation.
@@ -71,7 +79,7 @@ The information must be preserved across message-passing layers and used by the 
 
 Long-range dependency learning is not the same as learning on a large graph.
 A large graph may have a local target function, while a smaller graph may contain a prediction that depends on a long chain of relations.
-The relevant question is which parts of the graph determine the label and how far those parts are from the target.
+The relevant question is which parts of the graph determine the label and how far those parts are from the target node.
 
 The GLoRa paper formalizes one version of this idea through path-aware dependencies \cite{zhou2025glora}.
 The formal definition is deferred to a later chapter of this thesis.
@@ -81,12 +89,12 @@ If a model can ignore the path and still classify all examples correctly, then t
 Many graph tasks contain correlations that are easier than the dependency they are meant to test.
 The label might correlate with node degree, graph size, local feature counts, or another statistic that does not require the learned function to use the intended path information.
 A model that uses such a statistic can obtain a high score while failing to learn the dependency of interest.
-Long-range dependency learning is therefore also an evaluation problem.
+Long-range dependency learning is therefore also an evaluation problem: the benchmark must make the intended dependency necessary.
 
 \section{Why Long-Range Dependencies Are Difficult}
 
-The most direct way to let a message-passing GNN use farther information is to increase the number of layers.
-More layers increase the size of the receptive field.
+This section explains why long-range dependencies are hard for message-passing GNNs and why GLoRa tests this difficulty by increasing dependency length.
+The direct architectural response is to add message-passing layers, because each layer expands the target node's receptive field by one hop.
 In principle, a target node can then receive information from nodes at larger graph distance.
 In practice, adding layers changes the learning problem in several ways.
 
@@ -114,11 +122,13 @@ These directions are important, but they do not remove the need for careful eval
 A method designed to reduce over-smoothing may improve accuracy on a benchmark without learning a longer dependency.
 A rewiring method may shorten paths in a useful way, but the resulting score still needs to be interpreted relative to the task that the benchmark actually enforces.
 The same is true for transformer-based systems, which can exchange information broadly but still need evidence that the learned function uses the intended graph dependency.
+For GLoRa, these explanations are hypotheses to test rather than assumptions that automatically explain any drop in accuracy.
 
 \section{Evaluation as a Central Problem}
 
-Benchmark results often serve as the main evidence that one graph learning system is better than another.
-For many purposes, this is reasonable: if a model improves performance on a realistic task, the improvement can be useful even when the exact target function is unknown.
+This section explains why evaluation is central to the thesis: a benchmark score supports a long-range claim only if the benchmark requires the model to use information at the intended graph distance.
+GLoRa is introduced in this context because it controls graph structure and label construction so that high accuracy is evidence about a specified dependency length.
+For many purposes, benchmark accuracy is still a reasonable comparison: if a model improves performance on a realistic task, the improvement can be useful even when the exact target function is unknown.
 Long-range dependency learning makes a more specific claim.
 It is not only that the model performs well, but that it can learn a dependency at a certain graph distance.
 
@@ -156,10 +166,12 @@ This point connects the broader literature to the contribution of GLoRa.
 
 \section{The Role of GLoRa}
 
+This section summarizes how GLoRa makes the thesis question testable.
 GLoRa is a benchmark generator for testing whether graph learning systems can learn dependencies of a specified length \cite{zhou2025glora}.
-For each length parameter, it generates binary node-classification examples.
+It matters for the thesis because it turns dependency length from a loose property of a dataset into a controlled input to a node-classification benchmark.
+For each length parameter, GLoRa generates binary node-classification examples.
 Each example contains a target node and paths leading to it.
-The intended label depends on whether a source node is connected to the target through a path with the required feature pattern.
+The intended label depends on whether a source node is connected to the target node through a path with the required feature pattern.
 
 The construction is designed to avoid simple shortcut solutions.
 Negative examples contain a hole on the relevant path.
@@ -188,8 +200,8 @@ The benchmark is therefore a diagnostic tool, not only a leaderboard.
 
 \section{Research Questions}
 
-The thesis is guided by three research questions.
-Together, they connect the modelling problem, the evaluation problem, and the specific contribution of GLoRa.
+This section states the questions that organize the thesis and connect the GLoRa paper to the surrounding chapters.
+The questions separate three issues: what makes long-range dependency learning hard, how a benchmark can test dependency length, and what the GLoRa experiments show about current systems and common explanations.
 
 \begin{description}
 \item[RQ 1:]
@@ -208,10 +220,13 @@ This question concerns the empirical findings of the included paper.
 It asks how far the evaluated systems can learn under the GLoRa construction and whether the observed degradation is explained by the three common failure modes.
 \end{description}
 
+Together, the questions keep the thesis focused on what a benchmark can show about dependency length and how GLoRa sharpens that evidence.
+
 \section{Contributions}
 
-The main contribution of this thesis is the included paper on GLoRa.
-The paper is listed as Paper I in the thesis.
+This section identifies the thesis contributions and ties each one to the included GLoRa paper.
+The main contribution is Paper I, which uses controlled node-classification benchmarks to study whether graph learning systems learn long-range dependencies of specified lengths.
+The paper is listed below.
 
 \begin{description}
 \item[Paper I]
@@ -243,7 +258,8 @@ It makes one important question testable under controlled conditions: whether a 
 
 \section{Outline}
 
-The remainder of the kappa is organized as follows.
+This section gives the map for readers who want to follow the argument from graph learning basics to the GLoRa benchmark and its interpretation.
+The remaining chapters first define message passing and long-range dependencies, then review explanations and benchmarks, present GLoRa, and close with limitations and future work.
 
 Chapter 2 introduces graph learning and message-passing graph neural networks.
 It defines the basic graph learning tasks used in the thesis and explains how local message passing builds node representations.
@@ -255,7 +271,7 @@ It also prepares the formal discussion of path-aware dependencies used by GLoRa.
 
 Chapter 4 reviews common explanations of long-range failure.
 It discusses over-smoothing, over-squashing, and vanishing gradients as separate but interacting explanations.
-It also reviews the main families of methods that try to mitigate these problems.
+It also explains why an accuracy drop with increasing dependency length is not by itself a diagnosis.
 
 Chapter 5 surveys the state of the art in architectures and benchmarks for long-range graph learning.
 It covers standard GNNs, deeper GNN variants, graph rewiring methods, graph transformers, and existing benchmark families.
