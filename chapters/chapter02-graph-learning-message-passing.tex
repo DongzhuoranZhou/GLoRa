@@ -13,12 +13,12 @@ This locality explains why GNNs can share parameters across graphs of different 
 
 The notation follows the GLoRa paper closely.
 A graph is written as $G=(V,E,\lambda)$.
-Here $V$ is a finite set of nodes, $E\subseteq V\times V$ is a set of directed edges, and $\lambda:V\to\mathbb{R}^n$ maps each node to a feature vector.
+Here $V$ is a finite set of nodes, $E\subseteq V\times V$ is a set of directed edges, and $\lambda:V\to\mathbb{R}^{n}$ maps each node to a feature vector.
 Nodes are denoted by $u,v\in V$.
 An edge $(u,v)\in E$ points from $u$ to $v$.
 The incoming neighbourhood of $v$ is
 \[
-N(v)=\{u\mid (u,v)\in E\}.
+N(v)=\{u\in V\mid (u,v)\in E\}.
 \]
 The node feature dimension is $n$, and the symbol $d$ is reserved for path distance and dependency length.
 
@@ -35,7 +35,7 @@ This choice is not restrictive for undirected graphs.
 An undirected edge between $u$ and $v$ can be represented by including both directed edges $(u,v)$ and $(v,u)$ in $E$.
 With this convention, the same notation covers directed graphs, undirected graphs, and graphs whose direction is introduced only to control the flow of information.
 
-The map $\lambda:V\to\mathbb{R}^n$ gives each node an initial feature vector.
+The map $\lambda:V\to\mathbb{R}^{n}$ gives each node an initial feature vector.
 This vector may encode raw attributes, labels available as input, categorical values after one-hot encoding, continuous measurements, or features produced by a previous model.
 The initial hidden state of a message-passing model is usually set to this feature vector, so $h_v^{(0)}=\lambda(v)$.
 All later node states are learned representations derived from these initial features and from the graph structure.
@@ -145,7 +145,7 @@ Some introduce gates or residual connections.
 The common structure is still local aggregation followed by a shared update.
 
 The neighbourhood convention matters.
-With $N(v)=\{u\mid (u,v)\in E\}$, the hidden state $h_v^{(\ell)}$ receives information from nodes that have outgoing edges into $v$.
+With $N(v)=\{u\in V\mid (u,v)\in E\}$, the hidden state $h_v^{(\ell)}$ receives information from nodes that have outgoing edges into $v$.
 If the intended application uses the opposite direction, the graph can be built with the opposite edge orientation.
 If the graph is undirected, both orientations are included.
 The mathematical point is that a layer follows the directed edges that are available to it.
@@ -366,7 +366,7 @@ It asks how long a dependency the system can learn before performance collapses.
 
 The notation used in the thesis is now fixed.
 A graph is $G=(V,E,\lambda)$.
-Directed edges are written $(u,v)\in E$, node features are given by $\lambda:V\to\mathbb{R}^n$, and the incoming neighbourhood of $v$ is $N(v)=\{u\mid (u,v)\in E\}$.
+Directed edges are written $(u,v)\in E$, node features are given by $\lambda:V\to\mathbb{R}^{n}$, and the incoming neighbourhood of $v$ is $N(v)=\{u\in V\mid (u,v)\in E\}$.
 Message-passing GNNs set $h_v^{(0)}=\lambda(v)$ and update hidden states layer by layer through neighbourhood aggregation and node-wise combination.
 The layer index is $\ell$, and the hidden state of node $v$ at layer $\ell$ is $h_v^{(\ell)}$.
 
