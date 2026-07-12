@@ -1,27 +1,30 @@
 \chapter{The GLoRa Contribution}
 \label{chap:glora-contribution}
 
-GLoRa is the methodological core of the thesis.
+A benchmark score supports this thesis only if the score says which dependency the model had to learn.
 The included paper introduces GLoRa as a benchmark generator for testing whether a graph learning system can learn dependencies of a specified length \cite{zhou2025glora}.
-The contribution is not only a new synthetic dataset, but also a way to make a benchmark score support a sharper evaluation claim.
-A usual graph benchmark can show that a model has found a predictive pattern.
-It does not by itself show that the model used the intended long-range graph dependency.
-GLoRa addresses this evaluation problem by controlling both the target function and the shortcut functions that could otherwise fit the same labels.
-For a chosen dependency-length parameter $d$, it generates balanced node-classification examples whose labels are tied to a source-to-target path condition, while adding enough random structure to rule out shortcut functions.
+The contribution is not just a synthetic dataset; it is a way to make high accuracy support a dependency guarantee.
+A usual graph benchmark can show that a model found some predictive pattern.
+It does not by itself show that the pattern is the intended long-range graph dependency.
+GLoRa addresses this gap by controlling the target function and the shortcut functions that could otherwise fit the same labels.
+For a chosen dependency-length parameter $d$, it generates balanced node-classification examples whose labels are tied to a source-to-target path condition.
+It then adds random structure that rules out simpler ways to fit those labels.
 
-The chapter follows that design problem.
-Section~\ref{sec:glora-motivation} explains why benchmark design matters when the claim is about learning a dependency at a specified graph distance.
-Section~\ref{sec:glora-path-aware} defines the path-aware dependency that the benchmark is meant to certify.
-Sections~\ref{sec:glora-design} and~\ref{sec:glora-shortcuts} explain the generator and the shortcut functions it excludes.
-Section~\ref{sec:glora-expressibility} explains why the intended function must be expressible by the evaluated GNN-based systems.
-Sections~\ref{sec:glora-protocol}--\ref{sec:glora-diagnostics} summarize how the benchmark is used as evidence, what the experiments observe, and what the diagnostics do and do not explain.
-The final section connects GLoRa to the thesis-level argument that progress requires scores that certify the dependency they claim to measure.
+The chapter follows the construction from evaluation claim to evidence.
+First, benchmark scores need a dependency guarantee when they are used to evaluate long-range learning.
+Second, path-aware dependency defines the target that the benchmark is meant to certify.
+Third, the generator removes shortcuts with holes, alternative chains, and extra holes, while directed edges keep the path count controlled.
+Fourth, expressibility prevents the benchmark from becoming an impossible task for the evaluated GNN-based systems.
+Fifth, the experiments use accuracy over increasing $d$ to estimate where each system's length limit begins.
+Finally, the diagnostics narrow the explanation for the observed failures.
+The chapter ends by connecting GLoRa to the thesis-level argument that progress requires scores that certify the dependency they claim to measure.
 
 \section{Motivation}
 \label{sec:glora-motivation}
 
-Benchmark construction is part of the long-range graph learning problem because accuracy is useful only when it certifies the dependency a model had to learn.
-GLoRa frames the problem in this way: for a specified graph distance, the benchmark should force successful models to use a path-aware source-to-target dependency rather than a shortcut.
+Benchmark construction is part of the long-range graph learning problem.
+Accuracy is useful for this thesis only when it certifies the dependency that a model had to learn.
+GLoRa frames the requirement plainly: for a specified graph distance, a successful model should have to use a path-aware source-to-target dependency rather than a shortcut.
 
 Long-range dependency learning is often discussed as a model problem.
 Message-passing graph neural networks update node representations by aggregating information from graph neighbours, so information from a source node at large graph distance can affect the target only after enough message-passing layers.
@@ -29,19 +32,20 @@ As the relevant graph distance grows, several difficulties may appear.
 Node representations may become too similar, information from many paths may be compressed into a small representation, or the gradients needed to train early layers may become too small \cite{li2018deeper,alon2021bottleneck,glorot2010difficulty}.
 These explanations motivate many architectural changes, including residual connections, normalization schemes, rewiring methods, diffusion methods, and graph transformer systems.
 
-GLoRa starts from a different but complementary question.
-Before deciding which architecture is best, one must know what the benchmark score certifies.
-For dependency length $d$, the central evaluation question is whether the system learned a function whose prediction for a target node genuinely depends on the distance and path information of a source-to-target path of length $d$.
-This question is stronger than asking whether a system has high accuracy on a dataset whose labels were generated from a long-range rule.
-A dataset can have more than one fitting function.
-One function may use the intended source-to-target path of length $d$, while another shortcut function may exploit a local count, a global graph statistic, a source-node marker, or an artifact of how positive and negative examples were generated.
-If both functions fit the examples, high test accuracy does not distinguish a model that learned the path-aware dependency from a model that learned the shortcut function.
+GLoRa asks a complementary evaluation question.
+Before comparing architectures, the benchmark must say what a score certifies.
+For dependency length $d$, the central question is whether the target prediction genuinely depends on the distance and path information of a source-to-target path of length $d$.
+That is stronger than asking whether a system has high accuracy on labels generated by a long-range rule.
+A dataset can admit more than one fitting function.
+One function may use the intended source-to-target path of length $d$.
+Another shortcut function may exploit a local count, a global graph statistic, a source-node marker, or an artifact of how positive and negative examples were generated.
+If both functions fit the examples, high test accuracy cannot distinguish a model that learned the path-aware dependency from a model that learned the shortcut.
 
 Real-world benchmarks are important because they represent practical tasks, but they are weak evidence for this particular claim.
 Their target functions are not fully controlled.
 Even when domain knowledge suggests that a task should involve long-range interactions, the benchmark may contain local correlations sufficient for prediction.
 Such a benchmark can still support comparative claims, for example that one model performs better than another on the same dataset.
-It cannot certify by itself that a model can learn dependencies of a specified graph distance.
+By itself, it cannot certify that a model can learn dependencies of a specified graph distance.
 The Long Range Graph Benchmark and related real-world benchmarks are valuable in this comparative sense, but their labels do not provide formal control over the dependency that a learned function must use \cite{dwivedi2022long,zhou2025glora}.
 
 Synthetic benchmarks offer more control, but only if they are designed with care.
@@ -51,22 +55,23 @@ However, a simple synthetic construction can still be misleading.
 If every positive example has no hole and every negative example has one visible hole, a model can solve the task by detecting the hole rather than by testing whether information is propagated from the source to the target through a valid path.
 If the only source node has a unique local degree pattern, a model can detect the source rather than learning the source-to-target path condition.
 If graph size differs between classes, a graph-level statistic may solve the benchmark.
-The design challenge is therefore to make the intended path-aware dependency necessary, not merely present.
+The design problem is to make the intended path-aware dependency necessary, not merely present.
 
 GLoRa is built around this challenge.
-It aims to satisfy three conditions at the same time.
+The generator aims to satisfy three conditions at the same time.
 First, fitting sufficiently many generated examples should require a dependency of length $d$.
 Second, at least one fitting function should be expressible by the GNN-based systems under evaluation, so failure cannot be dismissed as an expressivity mismatch.
 Third, positive and negative examples should come from the same stochastic generator, so the benchmark does not introduce an artificial distribution shift between classes \cite{zhou2025glora}.
-These conditions make GLoRa a benchmark generator rather than a fixed dataset.
+Together, these conditions make GLoRa a benchmark generator rather than a fixed dataset.
 For each dependency length $d$, it creates a benchmark whose role is to test learning at that length.
 Running a model over increasing values of $d$ then gives an empirical estimate of the largest dependency length that the model can learn under the benchmark conditions.
 
 \section{Path-Aware Dependency and Notation}
 \label{sec:glora-path-aware}
 
-GLoRa tests a target label whose value depends on a source-to-target path of length $d$, not merely on the presence of a distant source node.
-The notation below fixes the graph, the path, the source, and the target so that later claims about dependency length say exactly what kind of evidence the benchmark certifies.
+GLoRa's target is a path-aware dependency.
+The target label depends on a source-to-target path of length $d$, not merely on the presence of a distant source node.
+The notation below fixes the graph, the path, the source, and the target so that later claims about dependency length state exactly what evidence the benchmark certifies.
 
 The paper works with directed graphs, with an undirected variant obtained by symmetrizing the edges.
 Throughout this chapter, a graph is written as
@@ -84,9 +89,9 @@ The edges follow the path direction, so $(v_{i-1},v_i) \in E$ for every $i \in \
 The target prediction is the label assigned to $v_d$.
 
 The paper uses a path-aware formalization of long-range dependency.
-The phrase ``path-aware'' matters.
+The phrase ``path-aware'' is important because the definition is deliberately narrow.
 It does not try to capture every possible meaning of long-range dependence in graphs.
-Instead, it captures the kind of dependency where the target label depends on information that must be preserved along a particular source-to-target path.
+Instead, it captures a dependency where the target label depends on information that must be preserved along a particular source-to-target path.
 In this setting, it is not enough that a source node at large graph distance exists somewhere in the graph.
 The prediction must depend on the relation between the source $v_0$, the target $v_d$, and the intermediate nodes that connect them.
 
@@ -96,12 +101,12 @@ If the feature of any $v_i$ with $0<i<d$ is changed in a designated way, the out
 Second, the function must keep the same value when a duplicate of part of the path is changed but the original path remains intact.
 This prevents the definition from accepting functions that respond merely to the presence of a local feature value somewhere in the graph.
 Third, if both the original path and the duplicate are changed, the output changes again.
-Together, these requirements say that the source-to-target path is not a decorative structure around a simpler feature test.
+Together, these requirements say that the source-to-target path is not decoration around a simpler feature test.
 The prediction depends on the way information is arranged along the path from $v_0$ to $v_d$.
 
 This formalization gives the benchmark a concrete target.
-The benchmark should generate examples such that any function fitting the examples must rely on a path-aware dependency of length $d$.
-This is the property that distinguishes GLoRa from a benchmark where the labels are produced by a long-range rule but can also be fitted by a short-range shortcut function.
+The benchmark should generate examples so that any function fitting them must rely on a path-aware dependency of length $d$.
+This property distinguishes GLoRa from a benchmark whose labels are produced by a long-range rule but can also be fitted by a short-range shortcut function.
 The paper also introduces an approximate version of the definition, parameterized by a precision $\delta$.
 This is needed because GLoRa uses real-valued node features sampled from intervals rather than a fixed finite alphabet.
 The approximate definition preserves the same intuition: perturbing the relevant path features within a controlled tolerance should witness the dependency.
@@ -110,7 +115,9 @@ The approximate definition preserves the same intuition: perturbing the relevant
 \label{sec:glora-design}
 
 The GLoRa generator turns the path-aware definition into balanced inductive node-classification examples.
-Positive and negative graphs differ by whether a valid source-to-target path exists, while alternative chains and holes remove simple counts and local markers as shortcut functions.
+Positive and negative graphs differ by whether a valid source-to-target path exists.
+Alternative chains, holes, and extra holes remove simpler ways to predict the label.
+Directed edges keep the source-to-target path count controlled.
 This makes dependency length the controlled variable rather than an incidental property of the generated graphs.
 
 GLoRa generates inductive binary node-classification examples.
@@ -130,7 +137,8 @@ The second coordinate marks it as usable on a valid path.
 A hole has a feature of the form $(x,0)$.
 It breaks the intended path condition.
 \end{description}
-The remaining coordinate values, written here as $x$ and $y$, are sampled from a bounded set that stays away from $0$ and $1$.
+The remaining coordinate values are written here as $x$ and $y$.
+They are sampled from a bounded set that stays away from $0$ and $1$.
 In the paper, this set is $[-12,-2]\cup[3,13]$.
 This choice keeps the special marker values separated from the random filler values \cite{zhou2025glora}.
 
@@ -139,35 +147,35 @@ The target node $v_d$ is positive if and only if there is a source-to-target pat
 In the idealized picture, the witness path is $p=(v_0,\ldots,v_d)$.
 Every node $v_i$ for $0<i\leq d$ has a normal path feature $(x_i,1)$.
 If any intermediate node becomes a hole, the source-to-target path no longer witnesses a positive label.
-There are two uses of length here.
+The chapter uses length in two related ways.
 In the thesis notation, a dependency of exact length $d$ is witnessed by a path $p=(v_0,\ldots,v_d)$.
 In the implemented GLoRa generator, the parameter $d$ controls the scale of the sampled source-to-target path, and the exact path length may vary near that value so that length itself is not a class marker.
 When the chapter reports the experimental setting for $d$, it refers to this generator parameter unless an exact witness path is being defined.
 
 The generator has three parts.
-The first part creates a main source-to-target path.
+First, it creates a main source-to-target path.
 For a positive example, this path has no hole.
 For a negative example, one non-target intermediate node on the main source-to-target path is turned into a hole.
 If the generator stopped here, the task would be too easy for the wrong reason.
 A classifier could simply ask whether the graph contains any hole outside the target node.
 That question does not require using distance and path information from the source to the target.
 
-The second part adds alternative chains.
+Second, the generator adds alternative chains.
 Each alternative chain connects two points that already lie on previously generated chains.
 Each such chain contains a hole.
-The purpose is to make holes common in both positive and negative examples.
+These chains make holes common in both positive and negative examples.
 After this step, the existence of a hole is no longer enough to distinguish the labels.
 The classifier must identify whether there is at least one complete source-to-target path whose non-source nodes are all normal.
-In other words, it must reason about the source-to-target path condition, not only about the multiset of node features.
+It must reason about the source-to-target path condition, not only about the multiset of node features.
 
-The third part adds further holes.
+Third, the generator adds further holes.
 This step equalizes simple statistics of positive and negative examples, including the number of holes.
 For positive examples, the extra holes are placed away from the main source-to-target path so that it remains valid.
 For negative examples, the main source-to-target path already contains a hole.
 The added holes make it harder for a classifier to solve the task by counting holes or by using a rule such as ``positive graphs have one fewer hole than negative graphs.''
 The generator therefore combines a clear intended dependency with randomized distractors that remove the most obvious shortcut functions.
 
-The directed version of the construction is especially important for interpretation.
+Directedness is important for interpretation.
 Because edges point toward the target, the number of paths leading into $v_d$ is controlled by the number of additional chains.
 This number is sampled between five and ten in the paper's algorithm.
 The bound does not grow with $d$.
@@ -178,9 +186,11 @@ The directed construction keeps the evaluation focused on longer dependency leng
 \section{Examples and the Role of Shortcuts}
 \label{sec:glora-shortcuts}
 
-The shortcut problem is easiest to see from the smallest GLoRa examples.
-A clean source-to-target path should make the target positive, but the benchmark must prevent models from replacing that path condition with a cheaper rule such as counting holes.
-Alternative chains and added holes make the source-to-target path condition necessary, so benchmark scores rule out simpler explanations for success.
+The shortcut problem is visible even in the smallest GLoRa examples.
+A clean source-to-target path should make the target positive.
+The benchmark must also stop a model from replacing that path condition with a cheaper rule such as counting holes.
+Alternative chains and added holes make the source-to-target path condition necessary.
+As a result, a high benchmark score rules out the simpler explanations for success that those shortcuts would provide.
 
 The simplest GLoRa example is a positive path.
 There is a source $v_0$, a target $v_d$, and a path $p=(v_0,\ldots,v_d)$ between them.
@@ -199,7 +209,7 @@ A model with a global readout, a virtual node, or a preprocessing step that expo
 This shortcut function fits the data, but it does not rely on the path from $v_0$ to $v_d$.
 It does not matter where the hole is.
 It does not even matter whether the hole lies between the source and the target.
-The function has learned the artifact of the example construction, not the dependency the benchmark was meant to test.
+The function has learned an artifact of the example construction, not the dependency the benchmark was meant to test.
 
 Other shortcut functions are more subtle.
 If the source is always the only node with no incoming edges, a model may detect the source by local degree rather than by a path condition.
@@ -207,11 +217,11 @@ If positive examples have a different number of nodes or edges than negative exa
 If additional paths appear only in one class, the number of paths can become a class marker.
 If the target node has a different graph neighbourhood in positive and negative examples, a short-range message-passing model can perform well without using information from nodes at large graph distance.
 These shortcut functions are not implementation details.
-They decide what conclusion can be drawn from the benchmark score.
+They determine what conclusion the benchmark score can support.
 
 Appendix~D of the paper uses this lens to examine existing synthetic benchmarks \cite{zhou2025glora}.
 The criticism is not that those benchmarks are badly designed for every purpose.
-It is that they do not certify the particular claim GLoRa is designed to test.
+The point is that they do not certify the particular claim GLoRa is designed to test.
 Synthetic Chains, Graph Transfer, Ring Transfer, and Tree-Neighbours all contain long-range generative rules, but they also admit fitting functions that do not rely on the intended path-aware dependency.
 h-Proximity has a related issue: a fitting function can avoid depending on the features along the paths between relevant nodes and the target.
 Colour-Connectivity has the opposite problem.
@@ -222,21 +232,23 @@ GLoRa's design can be read as a response to both failure modes.
 It removes shortcut functions by adding alternative chains and holes in both classes.
 It also keeps the intended function expressible by standard GNN-based systems.
 The benchmark is therefore not hard merely because it is random, large, or noisy.
-It is hard in a targeted way.
+Its difficulty is targeted.
 To fit the examples, a model must learn whether a valid source-to-target path exists under the feature pattern.
 That is the property the benchmark is supposed to test.
 
 \section{Why Expressibility Matters}
 \label{sec:glora-expressibility}
 
-A controlled benchmark must avoid two opposite errors: allowing shortcut functions that make the task too easy, and choosing a target function outside the evaluated model class.
-GLoRa treats expressibility as part of benchmark design so that a failure can be interpreted as failure to learn an intended path-aware dependency, not as representational impossibility.
+A controlled benchmark must avoid two opposite errors.
+It should not allow shortcut functions that make the task too easy.
+It should also not choose a target function outside the evaluated model class.
+GLoRa treats expressibility as part of benchmark design so that failure can be interpreted as failure to learn an intended path-aware dependency, not as representational impossibility.
 
 The paper states three intended properties.
 Property (P1) says that all node-classification functions fitting sufficiently many generated examples rely on a dependency of length $d$, with arbitrarily high precision and probability.
 Property (P2) says that there exists a fitting function expressible by the GNN-based graph learning approaches considered by the paper, including GCNs.
 Property (P3) says that the benchmark is fair, because positive and negative examples are produced by the same probabilistic generator \cite{zhou2025glora}.
-The three properties work together.
+These three properties work together.
 (P1) gives the dependency guarantee.
 (P2) makes the benchmark a test of learning rather than an expressivity trap.
 (P3) prevents the label from being encoded through an avoidable distribution shift.
@@ -246,14 +258,15 @@ The paper invokes results showing that GCNs can express the intended function, a
 This does not mean that training will find the function.
 It means that the function is available in principle.
 Thus, when a system fails on GLoRa at length $d$, the failure is not explained simply by saying that no suitable GNN function exists.
-The failure must be located in the interaction between architecture, optimization, inductive bias, finite data, and the specific path condition.
+The remaining explanation must come from the interaction between architecture, optimization, inductive bias, finite data, and the specific path condition.
 
 The proof sketch in Appendix~C gives the intuition behind (P1).
 For a fixed $d$, the generator can produce only finitely many graph structures up to the sampled choices in the algorithm.
 Each relevant structure has nonzero probability.
 The continuous feature values are sampled from a bounded set, and the approximate dependency definition allows a precision tolerance $\delta$.
 For any desired probability level, a sufficiently large balanced sample will contain enough matching positive-negative configurations to witness the dependency condition.
-In such matched pairs, the examples agree in the ways needed to rule out shortcut functions, while differing at the designated path features that determine the label.
+In those matched pairs, the examples agree in the ways needed to rule out shortcut functions.
+They differ at the designated path features that determine the label.
 Any function that fits all these examples must therefore be sensitive to the intended path-aware dependency.
 
 This guarantee is stronger than the usual synthetic-benchmark statement that labels were generated by a long-range rule.
@@ -268,8 +281,9 @@ This distinction is the technical core of GLoRa's contribution.
 The experiments use GLoRa as a length-controlled test of many graph learning systems.
 For each generator parameter $d$, the protocol keeps the label rule, class balance, and GNN depth aligned with the same source-to-target path condition.
 Accuracy can therefore be read as evidence about whether a system learned a fitting function at that length.
+The curve over $d$ estimates where that evidence breaks down.
 
-The main experiment uses GLoRa to estimate the dependency-length limit of existing graph learning systems.
+The main experiment estimates the dependency-length limit of existing graph learning systems.
 For each length $d \in \{3,\ldots,15\}$, the paper generates 5000 positive and 5000 negative examples.
 Each half is split into training, validation, and test sets with ratio 80:10:10.
 The labels are balanced, so random guessing gives accuracy $0.5$.
@@ -283,7 +297,7 @@ The third category contains systems aimed at over-squashing and related long-ran
 The fourth category contains transformer-based graph systems: GraphTransformer, SAN, and GraphGPS with positional or structural encodings.
 The detailed implementation sources are listed in Appendix~A of the paper \cite{zhou2025glora}.
 
-The training protocol is deliberately broad rather than tuned for a single architecture.
+The training protocol is broad rather than tuned for a single architecture.
 Each system is run five times on each benchmark.
 Training lasts for at most 300 epochs or until convergence.
 Hyperparameters are validated, and the reported score is the average test accuracy over the five runs.
@@ -297,13 +311,14 @@ As $d$ increases, the generated graphs become larger and the average source-to-t
 For example, the average path length from source to target is reported as 5 for generator parameter $d=5$, 9 for $d=10$, and 14 for $d=15$.
 These averages are close to, but not always equal to, the parameter value because the generator varies the exact path length.
 The average in-degree remains around 2 in the reported statistics.
-This is consistent with the benchmark's design: the task becomes longer-range without turning into an uncontrolled high-degree compression problem.
+This matches the benchmark's design: the task becomes longer-range without turning into an uncontrolled high-degree compression problem.
 
 \section{Main Findings}
 \label{sec:glora-main-findings}
 
-The main experiment asks whether strong graph learning systems can keep solving the source-to-target path condition as GLoRa increases the dependency-length parameter.
-The answer is negative but specific: across the tested families, performance drops before the larger lengths provide reliable evidence of learning the intended dependency.
+The main experiment asks whether strong graph learning systems keep solving the source-to-target path condition as GLoRa increases the dependency-length parameter.
+The answer is negative but specific.
+Across the tested families, performance drops before the larger lengths provide reliable evidence of learning the intended dependency.
 
 Many systems fail as $d$ grows, and most show a clear performance drop before $d$ reaches 9.
 Some systems perform better than others, but even the best systems perform poorly after $d=11$.
@@ -337,8 +352,8 @@ It estimates where the system's dependency-length performance begins to fail.
 \section{Diagnostic Findings}
 \label{sec:glora-diagnostics}
 
-The diagnostic experiments ask why performance drops on GLoRa.
-They compare the observed failures with the traces predicted by over-smoothing, over-squashing, and vanishing gradients.
+The diagnostic experiments ask which standard explanation matches the observed GLoRa failures.
+They compare the failures with the traces predicted by over-smoothing, over-squashing, and vanishing gradients.
 In the tested setting, those traces do not support the three standard explanations.
 
 The paper asks whether the observed degradation can be explained by the three standard causes introduced earlier in the thesis: over-smoothing, over-squashing, and vanishing gradients.
@@ -350,7 +365,8 @@ The reported diagnostics do not support treating them as explanations for the pa
 \subsection{Over-smoothing}
 
 The over-smoothing diagnostic asks whether target-node representations collapse when dependency length becomes hard.
-For the inspected systems, representations become confused at $d=13$, but they do not converge to a single indistinguishable value.
+For the inspected systems, representations become confused at $d=13$.
+They do not converge to a single indistinguishable value.
 
 If over-smoothing explained the failure, one would expect node representations to converge as the number of layers grows.
 In the experiment, the paper compares the largest length where accuracy is perfect for the selected systems with the smallest length where accuracy is close to random guessing.
@@ -358,7 +374,8 @@ These lengths are $d=6$ and $d=13$.
 For each case, it extracts the one-dimensional last-layer representation of the target node and plots the distribution across examples.
 At $d=6$, the values for positive and negative examples are clearly separated.
 At $d=13$, the values are mixed, as expected from poor accuracy.
-However, they do not collapse to a single value and still have substantial standard deviation.
+However, they do not collapse to a single value.
+They still have substantial standard deviation.
 The representations are confused, but not smoothed into indistinguishability.
 The paper therefore argues that over-smoothing is not the observed reason for failure in this diagnostic.
 
@@ -374,7 +391,8 @@ In some graph families, the number of relevant paths or walks into a target can 
 GLoRa's directed construction avoids this.
 Each example has a bounded number of additional chains, at most ten in the generator.
 Therefore, the number of source-to-target paths remains bounded independently of $d$.
-The task becomes longer because the path gets longer, not because an exponentially growing number of paths must be compressed into the target representation.
+The task becomes longer because the path gets longer.
+It does not become longer because an exponentially growing number of paths must be compressed into the target representation.
 
 This point depends on directedness.
 In an undirected graph, message passing can use both edge directions, and even a simple path can induce many possible message-passing walks into the target.
@@ -385,7 +403,8 @@ It lets the diagnostic argument say that the benchmark structure does not direct
 \subsection{Vanishing gradients}
 
 The vanishing-gradient diagnostic asks whether early message-passing layers stop receiving a usable training signal as the models get deeper.
-The inspected gradients remain stable, so the measured training dynamics do not support that explanation in the tested setting.
+The inspected gradients remain stable.
+The measured training dynamics therefore do not support that explanation in the tested setting.
 
 The vanishing-gradient diagnostic examines training dynamics.
 If the failure came from gradients disappearing in early layers, then the first-layer gradients should become very small as the model depth grows.
@@ -397,7 +416,7 @@ This suggests that the models are not failing because gradient signals cannot re
 This result is also consistent with the training protocol.
 The evaluated systems use standard techniques that help gradient flow, including AdamW, weight initialization, gradient clipping, ReLU activations, and batch normalization.
 These techniques do not guarantee success on GLoRa, but they weaken the explanation that the models simply could not train because of vanishing gradients.
-The failure is therefore sharper for the inspected systems.
+The failure is therefore more specific for the inspected systems.
 They are given enough message-passing layers, the intended function is expressible, the measured target representations do not collapse, the directed graphs avoid uncontrolled path compression, and the measured gradients do not vanish.
 Yet these systems still fail at modest dependency lengths.
 
@@ -405,13 +424,15 @@ Yet these systems still fail at modest dependency lengths.
 \label{sec:glora-interpretation}
 
 GLoRa is the thesis-level contribution because it links a benchmark score to the dependency a model had to learn.
-Its role is not to propose another architecture, but to provide a controlled path-aware test in which shortcut functions and expressivity traps are addressed together.
+Its role is not to propose another architecture.
+Instead, it provides a controlled path-aware test in which shortcut functions and expressivity traps are addressed together.
 
 GLoRa contributes to this thesis in two ways.
 First, it gives a benchmark generator for controlled long-range dependency evaluation.
 For each chosen $d$, it creates examples that target a source-to-target path condition and are designed to rule out shortcut functions.
 Second, it changes how benchmark results should be read.
-The result of a GLoRa experiment is not only an accuracy number; it is evidence about the length of path-aware dependency that a system can learn under controlled conditions.
+The result of a GLoRa experiment is not only an accuracy number.
+It is evidence about the length of path-aware dependency that a system can learn under controlled conditions.
 
 The contribution is methodological as much as empirical.
 Empirically, a broad set of state-of-the-art systems fails beyond modest lengths.

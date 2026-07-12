@@ -33,28 +33,29 @@
 \frontmatter
 
 \begin{abstract}
-Graph neural networks typically compute node representations through message-passing layers that aggregate one-hop neighbourhood information.
-This local mechanism is useful because it respects the structure of a graph, but it also creates a difficulty: a prediction may depend on information at large graph distance from the target node.
-Many graph learning systems lose accuracy in this setting.
-This failure is often explained through over-smoothing, over-squashing, or vanishing gradients.
+Graph neural networks usually compute node representations by passing messages between neighbouring nodes.
+This local mechanism follows the graph structure, but it creates a difficulty when the label of a target node depends on information many hops away.
+Many graph learning systems lose accuracy on such tasks.
+This loss is often explained through over-smoothing, over-squashing, or vanishing gradients.
 
-This thesis studies long-range dependency learning in graph neural networks through the lens of benchmark design.
-It focuses on the question of how to test whether a graph learning system has actually learned a dependency of a specified length.
+This thesis studies long-range dependency learning in graph neural networks as an evaluation problem as well as an architectural problem.
+The central question is how to test whether a graph learning system has learned a dependency of a specified length, rather than a shortcut function that fits the same examples.
 The included paper introduces GLoRa, a synthetic benchmark generator for this purpose.
-GLoRa creates node-classification tasks parameterized by dependency length and is designed so that fitting the generated examples requires learning the intended long-range dependency.
+GLoRa creates node-classification tasks parameterized by dependency length.
+The tasks are designed so that fitting the generated examples requires learning the intended path-aware dependency.
 
-The extended introduction places GLoRa in the broader literature on graph neural networks, long-range dependencies, over-smoothing, over-squashing, graph rewiring, graph transformers, and graph learning benchmarks.
-It argues that long-range graph learning is not only an architectural problem.
-It is also an evaluation problem, because a benchmark can reward shortcut functions that do not use the dependency it is meant to test.
+The extended introduction places GLoRa in the literature on graph neural networks, long-range dependencies, over-smoothing, over-squashing, graph rewiring, graph transformers, and graph learning benchmarks.
+It argues that benchmark performance can be misleading when a task rewards shortcut functions that do not use the dependency it is meant to test.
+For this reason, long-range graph learning must be studied through the benchmarks used to measure it.
 \end{abstract}
 
 \begin{xabstract}[Sammendrag]
-Grafnevrale nettverk lærer ved å beregne noderepresentasjoner gjennom lokal naboskapsaggregering.
-Denne lokale mekanismen gjør at modellen kan utnytte grafstrukturen, men den skaper også en utfordring: en prediksjon kan avhenge av informasjon som har stor grafavstand til målnoden.
-Mange grafbaserte læringssystemer mister nøyaktighet i slike situasjoner.
-Denne svikten forklares ofte med over-smoothing, over-squashing eller forsvinnende gradienter.
+Grafnevrale nettverk beregner vanligvis noderepresentasjoner gjennom lokal naboskapsaggregering.
+Denne lokale mekanismen utnytter grafstrukturen, men den skaper også en utfordring når en prediksjon avhenger av informasjon som har stor grafavstand til målnoden.
+Mange grafbaserte læringssystemer mister nøyaktighet på slike oppgaver.
+Dette tapet forklares ofte med over-smoothing, over-squashing eller forsvinnende gradienter.
 
-Avhandlingen undersøker hvordan grafnevrale nettverk lærer avhengigheter over lange avstander.
+Avhandlingen undersøker hvordan grafnevrale nettverk lærer langtrekkende avhengigheter.
 Hovedspørsmålet er hvordan man kan teste om et grafbasert læringssystem faktisk har lært en avhengighet med en bestemt lengde.
 Den inkluderte artikkelen introduserer GLoRa, en syntetisk benchmark-generator for dette formålet.
 GLoRa lager nodeklassifiseringsoppgaver med en valgt avhengighetslengde.
@@ -67,11 +68,12 @@ Det er også et evalueringsproblem, fordi en benchmark kan belønne snarveier so
 
 \begin{preface}
 This thesis was written at the Department of Informatics, University of Oslo, under the supervision of Egor V. Kostylev and Evgeny Kharlamov.
-I am grateful to my supervisors for their guidance, feedback, and support throughout the work on GLoRa and this thesis.
+I am grateful to my supervisors for their guidance, feedback, and support throughout my work on GLoRa and this thesis.
 I also thank my collaborators and colleagues for the discussions that helped shape the ideas presented here.
 
 The thesis follows the article-based format.
-The extended introduction gives the background, state of the art, and thesis-level discussion, and the included paper is reproduced after the kappa.
+The extended introduction gives the background, state of the art, and thesis-level discussion.
+The included paper is reproduced after the kappa.
 \end{preface}
 
 \tableofcontents

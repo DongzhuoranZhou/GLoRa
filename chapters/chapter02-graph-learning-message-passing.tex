@@ -2,17 +2,20 @@
 
 \section{Purpose of the Chapter}
 
-This chapter fixes the graph notation and message-passing model class used throughout the thesis.
-It matters because GLoRa asks whether the prediction at a target node used information from a source node at graph distance $d$, and that question needs precise names for graphs, neighbourhoods, node representations, layers, and dependency length.
-The chapter shows how one-hop neighbourhood aggregation makes long-range dependency learning both an architectural problem and a benchmark-design problem.
+Graph learning in this thesis rests on a fixed set of graph objects and message-passing operations.
+GLoRa asks whether the prediction at a target node used information from a source node at graph distance $d$, so graphs, neighbourhoods, node representations, layers, and dependency length need stable names.
+The same definitions show why one-hop neighbourhood aggregation makes long-range dependency learning both an architectural problem and a benchmark-design problem.
 
-Graph learning starts from a simple constraint: the input is a structured object with nodes, edges, and features, not a fixed-length vector.
-The order in which nodes are stored in memory should not affect the answer, and the number of nodes may change from one example to the next.
+Graph inputs are structured objects with nodes, edges, and features rather than fixed-length vectors.
+The order in which nodes are stored in memory should not affect the answer.
+The number of nodes may also change from one example to the next.
 
-The focus is message-passing graph neural networks, the standard reference point for long-range graph learning \cite{scarselli2008graph}.
-Message passing gives a model a local bias.
-A target node first aggregates information from its one-hop neighbourhood; information from a source node at larger graph distance can affect that target node only after more message-passing layers.
-This locality explains why GNNs can share parameters across graphs of different sizes, and it is also what makes dependency length a benchmark variable rather than only a property of the data.
+Message-passing graph neural networks are the standard reference point for long-range graph learning \cite{scarselli2008graph}.
+They give the model a local bias.
+A target node first aggregates information from its one-hop neighbourhood.
+Information from a source node at larger graph distance can affect that target node only after more message-passing layers.
+This locality explains why GNNs can share parameters across graphs of different sizes.
+It also makes dependency length a benchmark variable rather than only a property of the data.
 
 The notation follows the GLoRa paper closely.
 A graph is written as $G=(V,E,\lambda)$.
@@ -27,8 +30,8 @@ The node feature dimension is $n$, and the symbol $d$ is reserved for graph dist
 
 \section{Graphs and Features}
 
-This section defines the objects that a graph learning model receives: the graph $G=(V,E,\lambda)$, node features, optional edge features, and directed paths.
-These definitions matter because GLoRa controls which source node can affect a target node, and later long-range dependency claims rely on separating node features, edge features, and source-to-target graph distance.
+The input objects are the graph $G=(V,E,\lambda)$, node features, optional edge features, and directed paths.
+GLoRa controls which source node can affect a target node, so later long-range dependency claims rely on separating node features, edge features, and source-to-target graph distance.
 
 A graph represents objects and relations between objects.
 In a social network, nodes may represent users and edges may represent follows, friendships, or interactions.
@@ -61,8 +64,8 @@ In a molecular graph, a node feature may encode atom type, while an edge feature
 The model must combine both kinds of information without depending on an arbitrary ordering of the nodes or edges.
 
 Paths provide the basic language for graph distance and dependency length.
-A directed path from $u$ to $v$ of length $d$ is a sequence $p=(v_0,\ldots,v_d)$ of nodes.
-It satisfies $v_0=u$, $v_d=v$, and $(v_{i-1},v_i)\in E$ for each $i$ with $1\leq i\leq d$.
+A directed path from $u$ to $v$ of length $d$ is a sequence of nodes $p=(v_0,\ldots,v_d)$.
+The sequence satisfies $v_0=u$, $v_d=v$, and $(v_{i-1},v_i)\in E$ for each $i$ with $1\leq i\leq d$.
 When the path defines a dependency, $v_0$ is the source node and $v_d$ is the target node.
 The graph distance from $u$ to $v$ is the smallest such length $d$, when such a path exists.
 This direction matters for message passing.
@@ -70,10 +73,9 @@ If messages are passed along incoming edges into a target node $v$, then informa
 
 \section{Graph Learning Tasks}
 
-This section explains what a graph learning model is asked to predict and where the prediction is attached.
-This matters because GLoRa is inductive binary node classification, so later benchmark claims concern the target node representation rather than a graph-level readout or a different output task.
+Graph learning tasks differ by what the model predicts and where that prediction is attached.
+GLoRa is inductive binary node classification, so later benchmark claims concern the target node representation rather than a graph-level readout or a different output task.
 
-Graph learning tasks differ in what the model must predict.
 Some tasks ask for a prediction for each target node.
 Other tasks ask for a prediction for the whole graph.
 The same graph representation can support both settings, but the final prediction function changes.
@@ -108,12 +110,13 @@ The GLoRa paper focuses on inductive binary node classification, where each exam
 The inductive setting is stricter in one respect.
 The model cannot solve the task by memorizing node identities in a single graph.
 It must learn a rule that applies across graph instances.
-Permutation equivariance and shared message-passing layers matter most in this setting.
+This is where permutation equivariance and shared message-passing layers become especially important.
 
 \section{Message-Passing Graph Neural Networks}
 
-This section defines the message-passing computation used as the thesis baseline for graph learning.
-Each layer performs one-hop neighbourhood aggregation, so $L$ controls which source nodes can influence a target node representation; later GLoRa arguments use this to separate structural impossibility from learnable but difficult dependencies.
+Message-passing computation is the thesis baseline for graph learning.
+Each layer performs one-hop neighbourhood aggregation, so $L$ controls which source nodes can influence a target node representation.
+Later GLoRa arguments use this fact to separate structural impossibility from dependencies that are representable but difficult to learn.
 
 Message-passing graph neural networks compute node representations through successive layers.
 Each layer reads the previous-layer representations of the neighbours of a node.
@@ -154,7 +157,7 @@ Different architectures choose different aggregation functions, different update
 Some use sums, means, or maxima.
 Some use learned attention weights.
 Some introduce gates or residual connections.
-The common structure is still one-hop neighbourhood aggregation followed by a shared update of each node representation.
+Across these variants, the common structure is one-hop neighbourhood aggregation followed by a shared update of each node representation.
 
 The neighbourhood convention matters.
 With $N(v)=\{u\in V\mid (u,v)\in E\}$, the node representation $h_v^{(\ell)}$ receives information from nodes that have outgoing edges into $v$.
@@ -170,8 +173,9 @@ The difference is a modelling convention rather than a change in the basic messa
 
 \section{Locality and Receptive Fields}
 
-This section explains how one-hop neighbourhood aggregation creates an $L$-layer receptive field around a target node.
-It matters because graph distance limits what that representation can depend on; GLoRa uses this limit to test dependencies from source nodes at dependency length $d$.
+One-hop neighbourhood aggregation creates an $L$-layer receptive field around a target node.
+Graph distance limits what the target node representation can depend on.
+GLoRa uses this limit to test dependencies from source nodes at dependency length $d$.
 
 Locality is the defining property of message passing.
 After one layer, $h_v^{(1)}$ can depend on $\lambda(v)$ and on the initial features of nodes in $N(v)$.
@@ -208,8 +212,9 @@ The benchmark question is therefore not only whether a model reaches high accura
 
 \section{Permutation Equivariance and Invariance}
 
-This section explains the symmetry properties that graph learning models need when node order has no meaning.
-These symmetries matter because GLoRa should measure functions of graph structure and node features, so later long-range claims should not depend on arbitrary node order.
+Graph learning models need symmetry properties because node order has no meaning.
+GLoRa should measure functions of graph structure and node features.
+Later long-range claims therefore should not depend on arbitrary node order.
 
 Graphs do not come with a meaningful order of nodes.
 A graph stored as an adjacency list, an adjacency matrix, or an edge list may list the same nodes in many different orders.
@@ -255,8 +260,8 @@ It is also part of the expressivity analysis of graph neural networks.
 
 \section{Standard Architectures at a Conceptual Level}
 
-This section summarizes common graph neural network architectures by the mechanism they change: aggregation, update, gating, propagation depth, or connectivity.
-This matters for GLoRa because benchmark scores can reflect repeated one-hop neighbourhood aggregation or a changed connectivity pattern that alters the effective graph distance.
+Common graph neural network architectures differ in the mechanism they change: aggregation, update, gating, propagation depth, or connectivity.
+For GLoRa, this distinction matters because benchmark scores can reflect repeated one-hop neighbourhood aggregation or a changed connectivity pattern that alters the effective graph distance.
 
 The original graph neural network model introduced the idea of learning node representations through repeated message-passing layers \cite{scarselli2008graph}.
 Modern architectures differ in how they instantiate the aggregation and update steps.
@@ -276,7 +281,7 @@ Graph attention networks replace fixed aggregation weights by learned attention 
 For a target node $v$, the model scores neighbours $u\in N(v)$ and uses these scores to weight their messages.
 This lets the model give more influence to some neighbours than to others.
 Attention remains local when it is restricted to $N(v)$, so it does not by itself remove the layer-by-layer distance constraint.
-This distinction matters when graph attention is used as a baseline for long-range dependency learning \cite{velickovic2018gat}.
+That distinction matters when graph attention is used as a baseline for long-range dependency learning \cite{velickovic2018gat}.
 
 Graph isomorphism networks use sum aggregation followed by multilayer perceptrons.
 The design is motivated by the need for expressive multiset aggregation.
@@ -287,7 +292,7 @@ This link is one reason GIN is often used when expressivity is part of the evalu
 Gated and recurrent graph neural networks add mechanisms that control how much new information enters a node representation.
 The update resembles recurrent neural network gating, where a node can keep part of its previous representation while incorporating a new message \cite{graves2012supervised}.
 In long-range settings, such gates are relevant because a useful detail from the source node must remain available across several message-passing layers before it affects the target node.
-GGNN and GatedGCN are examples of this gated direction \cite{li2016ggnn,bresson2017residual}.
+GGNN and GatedGCN are examples of architectures with this kind of gated update \cite{li2016ggnn,bresson2017residual}.
 
 Simplified graph convolutional models, such as SGC, remove some nonlinear transformations and collapse repeated propagation into a simpler linear form \cite{wu2019sgc}.
 These models are useful baselines because they separate the effect of graph propagation from the effect of deep nonlinear feature transformations.
@@ -303,9 +308,10 @@ Representative examples include rewiring methods and graph transformers used in 
 
 \section{Expressivity}
 
-This section defines expressivity as the set of graph functions that a model class can represent.
-For node classification this function maps a graph and a target node to a label; for graph classification it maps a whole graph to a label.
-This matters because GLoRa should test learned long-range dependencies, not inexpressible target functions, so later benchmark interpretation separates representability from whether training finds the dependency.
+Expressivity is the set of graph functions that a model class can represent.
+For node classification, the function maps a graph and a target node to a label.
+For graph classification, it maps a whole graph to a label.
+GLoRa should test learned long-range dependencies rather than inexpressible target functions, so later benchmark interpretation separates representability from whether training finds the dependency.
 
 Local message passing imposes an immediate expressivity limit.
 With $L$ layers, a node representation cannot depend on nodes outside its $L$-layer receptive field.
@@ -327,7 +333,7 @@ They are the conditions under which the model respects the graph abstraction.
 
 Theoretical work connects message-passing expressivity to logical and combinatorial notions of graph distinguishability \cite{barcelo2020logical}.
 The details are beyond the scope of this chapter, but the practical lesson is direct.
-Two graphs or two rooted nodes may be different in a mathematical sense while still being indistinguishable to a given message-passing architecture.
+Two graphs or two rooted nodes may be mathematically different while still being indistinguishable to a given message-passing architecture.
 When this happens, no amount of training data can make that architecture separate them unless the architecture or input features are changed.
 
 Expressivity should be separated from optimization.
@@ -338,11 +344,12 @@ The target function must be inside the model class, and the learning process mus
 
 \section{Why Benchmark Target Functions Must Be Expressible}
 
-This section explains why a long-range benchmark must rule out shortcut functions while keeping the intended target function expressible.
-It matters because GLoRa treats accuracy as evidence about a dependency of length $d$, and that interpretation fails if the score can be earned without the intended source-to-target path or if the target cannot be represented.
+Long-range benchmarks must rule out shortcut functions while keeping the intended target function expressible.
+GLoRa treats accuracy as evidence about a dependency of length $d$.
+That interpretation fails if the score can be earned without the intended source-to-target path or if the target cannot be represented.
 The GLoRa paper is motivated by avoiding both errors \cite{zhou2025glora}.
 
-The first error is a shortcut target.
+The first error is a shortcut function.
 The benchmark examples may be generated from a rule that involves a long path, while the finite dataset can also be fitted by another rule that does not use that path.
 A model that learns the shortcut may obtain high accuracy.
 The score then fails to show that the model learned the intended dependency.
@@ -354,8 +361,8 @@ If all positive graphs have a different number of nodes from all negative graphs
 If only one class contains a certain kind of local neighbourhood, a shallow GNN may solve the benchmark without using information at large graph distance.
 The benchmark may look long-range by construction while rewarding a short-range or graph-level statistic.
 
-The second error is an inexpressible target.
-The intended rule may genuinely require a long-range dependency, while the evaluated model class cannot represent that rule even in principle.
+The second error is an inexpressible target function.
+The intended rule may genuinely require a long-range dependency, but the evaluated model class may not be able to represent that rule even in principle.
 Low accuracy then does not reveal a failure to learn long-range dependencies.
 It may only reveal that the benchmark asked the model to compute a function outside its expressive power.
 This is a serious problem when the benchmark is used to compare methods.
@@ -379,8 +386,8 @@ It asks how long a dependency the system can learn before performance collapses.
 
 \section{Chapter Summary}
 
-This summary restates the chapter's local definitions and explains how they support the thesis argument about GLoRa and long-range dependency benchmarks.
-Graph distance, message-passing layers, node representations, and readout functions determine what a score can say about whether a model used the intended dependency.
+The chapter's local definitions support the thesis argument about GLoRa and long-range dependency benchmarks.
+Graph distance, message-passing layers, node representations, and readout functions determine what a benchmark score can say about whether a model used the intended dependency.
 
 The notation used in the thesis is now fixed.
 A graph is $G=(V,E,\lambda)$.
