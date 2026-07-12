@@ -2,11 +2,10 @@
 
 \section{What a Long-Range Dependency Is}
 
-A long-range dependency is a property of a task, not just a property of a graph.
-For node classification, the correct prediction at a target node depends on information separated from that node by graph distance.
-For graph classification, the readout returns one label for the whole graph, but the same issue appears when that label depends on distance and path information spread across several hops.
-The methodological claim of the thesis is that this distance should be controlled as an evaluation parameter.
-It should not be inferred only after a model performs well.
+A long-range dependency describes what information a task requires for a correct prediction, not merely the size or structure of its input graph.
+In node classification, the correct prediction at a target node depends on information separated from that node by graph distance.
+In graph classification, the readout returns one label for the whole graph, but that label can likewise depend on a relation or path spanning several hops.
+This thesis treats the required dependency length as an evaluation parameter that must be controlled before model performance is interpreted as evidence about dependency length.
 
 Throughout this chapter, a graph is written as
 \[
@@ -28,227 +27,190 @@ When the path is simple, all nodes in the sequence are distinct.
 The graph distance from a node \(u\) to a node \(v\), written here as \(\operatorname{dist}_G(u,v)\), is the shortest-path distance: the length of a shortest directed path from \(u\) to \(v\), when such a path exists.
 In an undirected graph, this is the usual shortest-path distance after each undirected edge has been represented in both directions.
 
-Informally, a prediction has a long-range dependency of length \(d\) when the correct answer at the target node \(v_d\) depends on information carried by a path \(p=(v_0,\ldots,v_d)\).
-The word ``depends'' is doing important work.
-It does not mean only that the source node \(v_0\) lies somewhere inside a large receptive field.
-It means that changing the relevant information on the path from the source node \(v_0\) to the target node \(v_d\) can change the correct prediction at \(v_d\).
-The source node, the target node, and the internal nodes all matter.
+These structural definitions provide the setting for an informal task-level definition.
+A prediction has a long-range dependency of length \(d\) when the correct answer at the target node \(v_d\) depends on information carried by a path \(p=(v_0,\ldots,v_d)\).
+Here, ``depends'' means that changing relevant information at the source node or along the path can change the correct prediction at \(v_d\).
+It does not mean only that \(v_0\) lies inside a large receptive field.
 
-This view is stricter than the everyday phrase ``uses global information''.
+This task-level view is stricter than the everyday phrase ``uses global information''.
 A model can aggregate information from many nodes and still ignore the particular path that defines the task.
 A graph can also have a large diameter while the label is determined locally.
 Conversely, a graph can be small but still require a prediction to coordinate information across several hops.
 Long-range dependency is therefore a relation between the graph, the label function, and the input changes that can alter the correct answer.
-The rest of the chapter turns this informal relation into a path-aware definition, then separates graph distance, path length, and dependency length.
+The rest of the chapter first explains this relation, then formalizes it through path interventions and derives its meaning for evaluation.
 
 \section{The Informal View}
 
-The local picture behind GLoRa is a source-to-target path whose information can change the target label.
-Start with a source node \(v_0\), a target node \(v_d\), and a path \(p=(v_0,\ldots,v_d)\) of length \(d\) between them.
-The graph contains relevant information at the source node, and the task asks for a label at the target node.
-The internal nodes \(v_1,\ldots,v_{d-1}\) make the source information relevant to that target.
-If changing the source node or the required internal nodes can change the correct label at \(v_d\), the task contains a long-range dependency.
-GLoRa evaluates this path-based task property, not the mere presence of distant nodes.
+To make the task-level definition concrete, fix a source node \(v_0\), a target node \(v_d\), and a path \(p=(v_0,\ldots,v_d)\) of length \(d\) between them.
+The source carries information relevant to the target label, while the internal nodes \(v_1,\ldots,v_{d-1}\) form the path through which that information becomes relevant.
+If changing relevant information at the source node or any required internal node can change the correct label at \(v_d\), the task contains a long-range dependency.
+GLoRa evaluates this path-based requirement rather than the mere presence of distant nodes.
 
-This picture matches the locality of message-passing graph neural networks.
+This source-to-target picture matches the locality of message-passing graph neural networks.
 After one message-passing layer, a node can directly combine information from its immediate neighbours.
-After more layers, information from nodes at larger graph distance can in principle affect the target.
-Chapter 2 described this mechanism.
-Each layer aggregates from neighbours and updates a node representation, so stacked message-passing layers expand the region from which that representation can draw information \cite{scarselli2008graph,kipf2017semi}.
-For a dependency of length \(d\), a message-passing system must preserve and transform the relevant source information across \(d\) message-passing layers.
+As described in Chapter 2, each additional layer aggregates from neighbours and updates the node representation, expanding the region from which the target representation can draw information \cite{scarselli2008graph,kipf2017semi}.
+Information from nodes at larger graph distance can therefore affect the target in principle.
+Along a dependency path of length \(d\), a standard message-passing system must preserve and transform the relevant source information across \(d\) layers.
 
-The phrase ``in principle'' matters.
-The existence of a source-to-target path does not guarantee that the model has learned to use the information on that path.
-Repeated aggregation can lose the source information.
-Aggregation can also compress it together with other information.
-The layers that first process it may receive little useful gradient information during training.
-The path information may also be unnecessary because the benchmark contains a shortcut.
-Later chapters discuss these failure modes, but the dependency concept belongs here because it defines what success would mean.
+The phrase ``in principle'' separates architectural access from learned use.
+The existence of a source-to-target path does not guarantee that the model has learned to use its information.
+Repeated aggregation may lose the source information or compress it together with other information, and the layers that first process it may receive little useful gradient information during training.
+The benchmark may also contain a shortcut that makes the path unnecessary.
+Later chapters examine these failure modes; the present chapter specifies the task property that a successful model must learn.
 
-The same local picture appears in social, traffic, biochemical, web, and financial graphs.
-The GLoRa paper uses these domains as motivation because each can contain predictions whose evidence is several hops away and becomes relevant through a path \cite{zhou2025glora}.
-The graph may contain thousands or millions of nodes, but the dependency of interest may still be one source-to-target path among many possible structures.
-For evaluation, the key question is whether the label forces the model to connect information across graph distance.
-GLoRa turns that question into a benchmark parameter.
+The same source-to-target pattern motivates examples from social, traffic, biochemical, web, and financial graphs, where evidence can become relevant through a path spanning several hops \cite{zhou2025glora}.
+Even in a graph with thousands or millions of nodes, the dependency of interest may be one source-to-target path among many possible structures.
+The evaluation question is whether the label forces a model to connect information across that graph distance.
 
 \section{A Formal View Based on Paths}
 
-The path-aware definition used by GLoRa turns informal dependence into intervention tests.
-The informal view says that a target label depends on information at large graph distance.
-The formal view asks what would have to change for the target label to change.
-The GLoRa paper answers this question by asking whether there is a path into the target whose internal nodes are necessary for the target classification \cite{zhou2025glora}.
+The informal account identifies a counterfactual: changing relevant path information can change the target label.
+The path-aware definition used by GLoRa makes this counterfactual precise through intervention tests on a path whose internal nodes are necessary for the target classification \cite{zhou2025glora}.
 
-Consider a node-classification function \(f\).
-The function takes a graph \(G=(V,E,\lambda)\) and a target node as input, and it returns a label.
-For a path-aware dependency of length \(d\), the witness is a graph \(G\), a simple path \(p=(v_0,\ldots,v_d)\), and the target node \(v_d\).
-The source node is \(v_0\).
-The formal question is whether the prediction \(f(G,v_d)\) depends on the path from the source node \(v_0\) to the target node \(v_d\).
+Consider a node-classification function \(f\) that takes a graph \(G=(V,E,\lambda)\) and a target node as input and returns a label.
+A path-aware dependency of length \(d\) is witnessed by a graph \(G\), a simple path \(p=(v_0,\ldots,v_d)\), and the target node \(v_d\), with \(v_0\) as the source node.
+The interventions test whether the prediction \(f(G,v_d)\) depends on the complete path from \(v_0\) to \(v_d\).
 
 The first intervention changes the input feature vector of one internal node \(v_i\), with \(0<i<d\), while leaving the rest of the graph fixed.
-If this change can alter the label of \(v_d\), then \(v_i\) is necessary to the decision.
+If this change can alter the label of \(v_d\), then \(v_i\) is necessary for the decision.
 The path-aware definition requires this sensitivity for every internal node on the witnessing path.
 In the notation of the GLoRa paper, each internal node \(v_i\) has an alternative feature vector \(a_i\neq \lambda(v_i)\).
 Changing \(\lambda(v_i)\) to \(a_i\) changes the classification of the target.
 
-This first condition does not yet force the function to use the path as a path.
-A function might be sensitive to a node on a long path for accidental reasons.
-For this reason, the GLoRa definition adds a duplicate-segment test.
+Internal-node sensitivity alone does not establish that the function uses these nodes as a path.
+A function might be sensitive to a node on a long path for an unrelated reason, so the GLoRa definition adds a duplicate-segment test.
 Take a contiguous internal segment of the path, from \(v_k\) to \(v_m\) with \(0<k\le m<d\), and duplicate that segment with the same node features.
 Then perturb one node on the duplicate segment.
 If the original path remains intact, the target label should not change.
 The corrupted duplicate should not by itself change the classification because the original path from \(v_0\) to \(v_d\) still carries the required information.
 
-The final part of the definition asks what happens when the original path is also damaged.
+The final intervention also damages the original path.
 If an internal node on the original path is perturbed and a node on the duplicated segment is perturbed as well, then the classification should change.
 This rules out an explanation in which a detached or duplicated piece carries the decision on its own.
 The target classification must be tied to a complete path from the source node \(v_0\) to the target node \(v_d\).
 
-Put less formally, the path-aware definition says three things.
-First, every internal node on the witnessing path matters.
-Second, a corrupted duplicate of part of the path does not matter while the original path is intact.
-Third, once the original path is corrupted, the duplicate cannot rescue the decision if it is also corrupted.
-Together these conditions make the dependency about distance and path information.
-They rule out a definition based only on the presence of a source node at large graph distance or on a count of special nodes in the graph.
+The three conditions play complementary roles.
+Sensitivity makes every internal node on the witnessing path necessary.
+The duplicate-segment test shows that a corrupted copy does not matter while the original path is intact, and the joint perturbation prevents that copy from rescuing a corrupted original path.
+Together, they tie the classification to distance and path information rather than only to a distant source node or a count of special nodes in the graph.
 
-This definition is stronger than a plain distance-based definition.
+The resulting definition is stronger than a plain distance-based definition.
 A plain definition might say that \(f(G,v_d)\) depends on a node \(v_0\) with \(\operatorname{dist}_G(v_0,v_d)=d\).
 That is a useful start, but it misses the fact that graphs are relational objects.
 The source node reaches the target node through edges and internal nodes.
 If the task only asks whether a source node of a certain type exists anywhere in the graph, then that source node may be far from the target node while the function still ignores the path.
 The path-aware view rules out this kind of detached global lookup.
 
-The GLoRa paper presents this definition as one possible formalization rather than the only possible formalization.
-Another formal view could ask only for a source node at large graph distance with certain properties.
-Another could treat graph-level interactions without naming a single target node.
+The GLoRa paper presents this definition as one possible formalization rather than the only one.
+An alternative could require only a source node with certain properties at large graph distance, or it could treat graph-level interactions without naming a single target node.
 The path-aware choice matches the message-passing question studied in this thesis.
 If the dependency is witnessed by a path from the source node \(v_0\) to the target node \(v_d\), then a benchmark should test whether the system can learn that path-aware dependency.
 
 \section{Graph Distance, Path Length, and Dependency Length}
 
-GLoRa must keep three quantities separate.
-Graph distance and path length describe structure in \(G\).
-Dependency length describes the task requirement that a prediction must use information across that structure.
-A benchmark can contain long paths without forcing a model to learn a long-range dependency.
-In this thesis, \(d\) denotes dependency length only when the label function makes that length necessary.
-Graph distance is the structural quantity.
-For two nodes \(u\) and \(v\), \(\operatorname{dist}_G(u,v)\) is the shortest-path distance from \(u\) to \(v\), when such a path exists.
-Graph distance is a property of the graph structure.
-It does not mention the label function.
+The formal witness separates three quantities that can coincide but need not do so.
+Graph distance and path length describe structure in \(G\), whereas dependency length describes what the label function requires across that structure.
+A benchmark can therefore contain long paths without requiring a model to learn a long-range dependency.
+For two nodes \(u\) and \(v\), the graph distance \(\operatorname{dist}_G(u,v)\) is the length of a shortest directed path from \(u\) to \(v\), when such a path exists.
+This distance is a property of the graph and does not involve the label function.
 
-Path length is a property of a particular path.
-For the path \(p=(v_0,\ldots,v_d)\), the length is \(d\).
-This path may or may not be a shortest path.
-When the thesis speaks about a dependency witnessed by \(p\), it is speaking about this particular path from the source node \(v_0\) to the target node \(v_d\).
+Path length instead belongs to a particular path.
+The path \(p=(v_0,\ldots,v_d)\) has length \(d\) because it contains \(d\) edges, whether or not it is a shortest path between its endpoints.
+When a dependency is witnessed by \(p\), the relevant structural object is this particular path from the source node \(v_0\) to the target node \(v_d\).
 
-Dependency length is a property of the task.
-It describes how far the relevant information is from the prediction target and, in the path-aware setting, which path information must be used.
-In the path-aware setting used by GLoRa, a dependency of length \(d\) is witnessed by a path \(p=(v_0,\ldots,v_d)\) whose internal nodes are necessary in the sense described above \cite{zhou2025glora}.
+Dependency length belongs to the task.
+In the path-aware setting, it is the length of a witnessing path whose information the label function must use.
+In GLoRa, a dependency of length \(d\) is witnessed by a path \(p=(v_0,\ldots,v_d)\) whose internal nodes are necessary under the interventions above \cite{zhou2025glora}.
+Throughout this thesis, \(d\) denotes dependency length only when the label function makes that length necessary.
 
-These quantities often agree, but they do not agree automatically.
+The three quantities often agree, but their agreement must be established rather than assumed.
 A graph may contain a path of length \(d\) even when a shorter path links the same endpoints.
-In that case, the graph contains a long path, but the shortest structural distance is smaller.
+The chosen path then has length \(d\), while the graph distance between its endpoints is smaller.
 A task may also contain a long path that is visually salient to a human designer, while the labels can be predicted by a local feature, a degree pattern, or a global count.
-In that case, the benchmark contains long paths, but the dependency length of a fitting function can be short.
+The benchmark then contains long paths, but a fitting function can have a short dependency length.
 
-For this reason, the GLoRa paper focuses on the functions that fit the generated examples.
-It is not enough that the intended function uses a path of length \(d\).
-If another function fits the same data without using a dependency of length \(d\), then high model accuracy does not certify long-range learning.
-The benchmark must make the long-range dependency necessary for fitting the examples, at least with the precision and probability guarantees stated by the benchmark construction \cite{zhou2025glora}.
+This distinction shifts evaluation from the intended rule to all functions that fit the generated examples.
+An intended function that uses a path of length \(d\) is not enough if another function fits the same data without a dependency of that length.
+In that case, high model accuracy does not certify long-range learning.
+The benchmark must make the long-range dependency necessary for fitting the examples, subject to the precision and probability guarantees stated by the GLoRa construction \cite{zhou2025glora}.
 
-The same distinction explains why graph diameter is not a sufficient benchmark statistic.
-Diameter gives the largest shortest-path distance between nodes.
-It does not tell us whether the label depends on the distant pairs.
+Graph diameter is insufficient for the same reason.
+It gives the largest shortest-path distance between nodes but does not show whether the label depends on any distant pair.
 A dataset with large-diameter graphs can be solved locally.
 A dataset with moderate-diameter graphs can still require a particular long path.
-Evaluation must therefore connect structural distance, path length, and the target function.
+Evaluation must connect structural distance and path length to the target function before either can be interpreted as dependency length.
 
 \section{Why Path-Aware Dependencies Matter}
 
-GLoRa uses a path-aware dependency because graph learning is not ordinary learning on unordered sets.
-Edges define how one node can affect another.
-A source node at large graph distance can matter because of what it is, how it is connected, or what lies between it and the target node.
-A definition that ignores the path misses this structure.
+Path awareness matters because graph learning is not ordinary learning on unordered sets.
+Edges determine how one node can affect another, so a distant source node can matter because of its features, its connections, or the nodes between it and the target.
+A distance-only definition cannot distinguish these possibilities.
 
-Consider two functions on the same graph.
-The first classifies the target as True if a source node \(v_0\) with a particular feature vector exists anywhere in the graph.
-The second classifies the target \(v_d\) as True if there exists a path \(p=(v_0,\ldots,v_d)\) of length \(d\).
-Along this path, \(v_0\) must have the source feature and every internal node must have the required continuation feature.
-Both functions may mention a source node at large graph distance from the target node.
-Only the second function requires distance and path information.
+Two functions on the same graph illustrate the difference.
+The first classifies the target as True whenever a source node \(v_0\) with a particular feature vector exists anywhere in the graph.
+The second classifies the target \(v_d\) as True only when there is a path \(p=(v_0,\ldots,v_d)\) of length \(d\) on which \(v_0\) has the source feature and every internal node has the required continuation feature.
+Both functions can involve a source node at large graph distance from the target node, but only the second requires distance and path information.
 
-This difference is central to the critique of synthetic benchmarks in the GLoRa paper.
-Some benchmarks are generated from an intended long-range rule, but the examples can also be fitted by a simpler rule that ignores distance and path information.
+This distinction underlies the GLoRa paper's critique of synthetic benchmarks.
+Examples generated from an intended long-range rule may also be fitted by a simpler rule that ignores distance and path information.
 For instance, if every positive example contains a special source node and every negative example lacks it, then a model can solve the benchmark by detecting that node anywhere in the graph.
 It need not learn how the source node connects to the target node.
-The path of length \(d\) is present in the construction, but it is not forced by the data.
+The construction contains a path of length \(d\), but the data do not force a fitting function to use it.
 
-Path awareness also prevents a benchmark from rewarding a model for using the wrong part of the graph.
+The same requirement prevents a benchmark from rewarding a model for using the wrong part of the graph.
 If a task is meant to test whether information is propagated from \(v_0\) to \(v_d\), a model should not be able to succeed by reading only the number of holes, the graph size, the target degree, or another feature correlated with the label.
 The GLoRa construction adds alternative paths and additional holes so that these shallow properties do not distinguish positive and negative examples in the intended way \cite{zhou2025glora}.
-This design reflects a general principle: a benchmark for a dependency should make shortcut functions insufficient.
+The general evaluation principle is that shortcut functions must be insufficient for fitting a benchmark intended to test a dependency.
 
-Path awareness is also helpful for diagnosing model behaviour.
-If a system fails on a task where every fitting function must use a path-aware dependency of length \(d\), then the failure is evidence about that length of dependency.
-If the system succeeds, the benchmark gives stronger evidence that the system learned the intended path-aware relation.
-This does not prove that the model has learned all forms of long-range reasoning.
-It gives a cleaner answer to the narrower question the benchmark controls.
+Requiring every fitting function to use a path-aware dependency also sharpens the meaning of model performance.
+When the target function is also expressible by the evaluated model class, failure provides evidence about that dependency length, while success provides stronger evidence that the model learned the intended path-aware relation.
+Neither result establishes how the model handles every form of long-range reasoning, but it answers the narrower question controlled by the benchmark.
 
-The path-aware view is especially natural for message-passing models.
-A message-passing model receives information from neighbours and updates node representations.
-For information from \(v_0\) to affect \(v_d\), it must be propagated through internal nodes or through graph modifications that create a shorter message-passing path.
+This path-aware view also aligns with the locality of message-passing models, which receive information from neighbours and update node representations.
+For information from \(v_0\) to affect \(v_d\), it must pass through internal nodes or through graph modifications that create a shorter message-passing path.
 If the task requires the internal nodes of \(p=(v_0,\ldots,v_d)\), then the model must preserve enough information about the path as messages propagate toward the target.
-The definition therefore connects the task-level notion of dependency to the architectural locality of graph neural networks.
+The formal definition thereby connects the task-level dependency to the architectural locality of graph neural networks.
 
 \section{Node-Level and Graph-Level Dependencies}
 
-The node-level definition used by GLoRa also clarifies graph-level tasks that use a readout.
-The issue is whether a path-aware dependency still makes sense when the output is a graph label rather than a target-node label.
-Node-level tasks give the cleanest formal setting, but graph-level readouts can still depend on the same source-to-target path information.
-The GLoRa paper formalizes the long-range issue for inductive binary node classification, and this is the setting used in the main contribution \cite{zhou2025glora}.
-In node classification, the target is explicit.
-For the path \(p=(v_0,\ldots,v_d)\), the target node is \(v_d\), and the model must predict the label of \(v_d\).
-The source node \(v_0\) is the place where relevant information originates.
-The internal nodes define the path along which that information becomes relevant.
+The formal definition above applies to inductive binary node classification, the setting of GLoRa's main contribution \cite{zhou2025glora}.
+Its explicit target makes the roles on the path unambiguous: \(v_0\) is the source of the relevant information, the internal nodes form the path through which it becomes relevant, and \(v_d\) is the node whose label the model predicts.
+Graph-level readouts have no such explicit target, but they can still depend on the same source-to-target path information.
 
-This setting makes interventions direct.
-One can change an internal node \(v_i\) and ask whether the prediction at \(v_d\) changes.
-One can duplicate a path segment and ask whether the target label stays the same under perturbations that leave the original path intact.
-The target node gives a fixed point from which distance and dependency are measured.
+In the node-level setting, interventions are direct because the target node provides a fixed point from which distance and dependency are measured.
+Changing an internal node \(v_i\) tests whether the prediction at \(v_d\) changes, while duplicating a path segment tests whether the target label remains stable under perturbations that leave the original path intact.
 
-Graph-level tasks are different because the output is attached to the graph as a whole.
+In a graph-level task, the output is attached to the graph as a whole.
 A molecule may be classified by a property of the entire molecular graph.
 A web graph or transaction graph may receive a single label.
 There may be no distinguished target node in the data format.
-Nevertheless, long-range dependencies still appear when the graph label depends on a relation between nodes at large graph distance or on a path structure that spans many hops.
+A long-range dependency nevertheless arises when the graph label depends on a relation between nodes at large graph distance or on a path structure spanning many hops.
 
-Two common views connect node-level and graph-level dependencies.
+Two views extend the node-level account to this setting.
 The first introduces a conceptual readout target.
 A graph classifier often computes node representations and then pools them into a graph representation.
-If a path of length \(d\) must be recognized before pooling, then the relevant dependency can still be described by a source node \(v_0\), a path \(p=(v_0,\ldots,v_d)\), and the node or region where the path information is represented before readout.
-The graph label depends on whether that path information is preserved until the readout.
+If the classifier must recognize a path of length \(d\) before pooling, the relevant dependency can still be described by a source node \(v_0\), a path \(p=(v_0,\ldots,v_d)\), and the node or region where the path information is represented.
+Under this view, the graph label depends on whether the path information is preserved until the readout.
 
-The second treats the path itself as the witness.
+The second view treats the path itself as the witness.
 For graph classification, the dependency of length \(d\) may mean that the graph label changes when a path \(p=(v_0,\ldots,v_d)\) is broken or when an internal node on the path is perturbed.
 The output is global, but the label still depends on a path-aware relation.
-This is close in spirit to the node-level definition, except that the final comparison is the graph label rather than \(f(G,v_d)\).
+The final comparison is then the graph label rather than \(f(G,v_d)\).
 
-These two views explain why node-level benchmarks can teach a broader lesson.
-Node classification gives the cleanest formal setting because it fixes the target node.
-Graph-level tasks add a pooling or readout step, but they do not remove the central difficulty.
-If the label requires information from distant parts of the graph to be combined before readout, the model still needs a mechanism that preserves the relevant information across graph distance.
+Both views preserve the central difficulty identified by the node-level definition.
+A pooling or readout step changes where the prediction is made, but a model must still preserve and combine the relevant information across graph distance when the graph label requires it.
 
-At the same time, node-level and graph-level tasks should not be collapsed into one another too quickly.
-In a node-level task, the direction from source to target is part of the problem.
-In a graph-level task, several source nodes may be possible and evidence may be collected in several places.
-A graph-level benchmark can therefore be easier or harder depending on how many redundant paths it contains.
+The two task types nevertheless remain distinct.
+A node-level task includes a direction from source to target, whereas a graph-level task may have several source nodes and collect evidence in several places.
+The difficulty of a graph-level benchmark can therefore depend on how many redundant paths it contains.
 If many paths certify the same label, a model may need only one of them.
 If the label depends on all paths satisfying a condition, the model may need to aggregate a much larger amount of information before readout.
-The dependency length \(d\) captures only one axis of difficulty.
+Dependency length \(d\) captures only one axis of this difficulty.
 
 \section{Examples Across Graph Domains}
 
-The same path-aware pattern appears across graph domains, even though the meaning of nodes and edges changes.
-The common question is whether the prediction depends on information that is several hops from the target and becomes relevant through a path.
+The path-aware account applies across graph domains even though nodes, edges, and labels have different meanings.
+In each case, the relevant question is whether information several hops from the target becomes necessary through a path.
 
 In social graphs, users may influence a target user's behaviour through friendship, following, communication, or interaction paths.
 In traffic graphs, a downstream road segment may depend on an upstream incident, congestion state, or control signal carried along the road network.
@@ -256,103 +218,82 @@ In biochemical graphs, a property at one atom, residue, protein, or molecular en
 In web graphs, a target page, item, or user may depend on hyperlink, recommendation, or user-item paths.
 In financial graphs, suspicious activity may appear only after following transfers across accounts, and the GLoRa paper lists anti-money laundering as one application area where long-range dependencies can be important \cite{zhou2025glora}.
 
-These examples are motivating patterns rather than complete domain models.
+These examples motivate the common dependency pattern rather than provide complete domain models.
 Each domain has its own data quality issues, graph construction choices, and label noise.
 A social graph edge does not mean the same thing as a molecular bond or a financial transfer.
-The shared point is narrower: many graph tasks contain predictions whose evidence is not local to the target.
-If that evidence becomes relevant through a path, then a path-aware dependency is the right object to test in a benchmark such as GLoRa.
+Their shared point is narrow: many graph tasks contain predictions whose evidence is not local to the target.
+When a path makes that evidence relevant, a benchmark such as GLoRa can test the corresponding path-aware dependency.
 
 \section{Large Receptive Field Is Not the Same as Long-Range Learning}
 
-Architectural reach and learned dependency are different claims.
-A model has access to information at large graph distance when its architecture allows nodes at that distance to influence the target representation.
-A model uses that information only when the learned function makes the prediction depend on it.
-Access is about what the computation could see.
-Use is about what changes the prediction.
-This distinction matters for GLoRa because benchmark success should show that the learned function uses the required path-aware dependency, not only that the architecture could access distant nodes.
+Architectural reach and learned use are different claims.
+A model has access to distant information when its architecture allows that information to influence the target representation, but it uses the information only when the learned prediction depends on it.
+A large receptive field establishes the first condition, not the second.
+For GLoRa, benchmark success should provide evidence of the required path-aware use rather than only architectural access.
 
 For a standard message-passing graph neural network, the receptive field of a target node grows with the number of message-passing layers.
 After enough layers, information from \(v_0\) can in principle reach \(v_d\) along \(p=(v_0,\ldots,v_d)\).
-This architectural fact is necessary for some message-passing systems to solve a dependency of length \(d\), but it is not sufficient.
+This reach is necessary for some message-passing systems to solve a dependency of length \(d\), but it is not sufficient.
 The learned parameters may ignore the source signal.
 The aggregation may mix the signal with other information before it reaches the target node.
 The task may also contain an easier rule that never uses the path.
 
-The same point applies to models that enlarge the receptive field more aggressively.
-Graph rewiring can add edges.
-Graph transformers can allow attention between many pairs of nodes.
+Graph rewiring enlarges the receptive field by adding edges, while graph transformers allow attention between many pairs of nodes.
 Virtual nodes or global readouts can create shorter paths for message passing.
 These mechanisms may help a model use information at large graph distance.
 They may also let the model bypass the original path-aware dependency that the benchmark was meant to test.
-If the benchmark does not force the path-aware dependency, a large receptive field can produce high accuracy without showing long-range learning.
+Unless the benchmark forces the path-aware dependency, their increased reach can produce high accuracy without showing long-range learning on the original graph.
 
-The distinction can be expressed as an intervention question.
+The interventions introduced earlier provide an operational test of use.
 Suppose a trained model predicts the correct label at \(v_d\).
-Now change the relevant information at \(v_0\), or change an internal node \(v_i\) on the path.
+Changing the relevant information at \(v_0\) or an internal node \(v_i\) on the path tests whether the prediction follows the corresponding change in the target function.
 If the prediction remains the same, then the model may not be using that path information.
 It may have learned a different feature correlated with the label.
-By contrast, if the prediction changes in the way the target function changes, there is stronger evidence that the model has learned the intended dependency.
+If the prediction changes with the target function, there is stronger evidence that the model learned the intended dependency.
 
-The path-aware definition is therefore not just a formal nicety.
-It specifies the counterfactual evidence needed to support a long-range claim.
-The path \(p=(v_0,\ldots,v_d)\) is not a decoration inside the graph.
-It is the path whose integrity should matter to the target prediction.
-A large receptive field says that the model could use this path.
-A path-aware dependency test asks whether success requires using it.
+The integrity of \(p=(v_0,\ldots,v_d)\) thus supplies the counterfactual evidence behind a long-range claim.
+A large receptive field says that the model could use this path, whereas a path-aware test asks whether successful prediction requires it.
 
-This difference also affects how experimental results should be interpreted.
-When a model performs well on a long-range benchmark, the result can mean several things.
-It may have learned the intended long-range dependency.
-It may have learned a shortcut.
-It may have used architectural features that changed the graph so that the original distance no longer describes the computation.
+Strong benchmark performance may mean that the model learned the intended long-range dependency, learned a shortcut, or used architectural features that changed the graph so that the original distance no longer describes the computation.
 Only the first interpretation directly supports the claim that the model can learn dependencies of the specified length in the original graph.
 Benchmark design must separate these possibilities as much as possible.
 
 \section{Dependency Length as an Evaluation Parameter}
 
-If long-range dependency is a task property, then dependency length should be controlled during evaluation.
+Once dependency length is defined as a task requirement, it can be controlled during evaluation.
 This is the central methodological move behind GLoRa.
-Instead of asking only whether a model obtains high accuracy on a dataset, GLoRa asks whether the model can learn a task whose fitting functions require a dependency of chosen length \(d\) \cite{zhou2025glora}.
+Rather than asking only whether a model obtains high accuracy, GLoRa asks whether it can learn a task whose fitting functions require a chosen dependency length \(d\) \cite{zhou2025glora}.
 
-Treating \(d\) as an evaluation parameter changes the experimental question.
-For a fixed dataset, a model has one score.
-For a family of datasets parameterized by \(d\), a model has a performance curve.
-The curve can show whether the model succeeds at short dependencies and fails at longer ones.
-It can also show whether different architectures have different length limits.
-This is more informative than a single aggregate score.
-The central challenge is not only whether the model can use nonlocal information, but how far that ability extends.
+Treating \(d\) as an evaluation parameter replaces a single dataset score with a performance curve over a family of datasets.
+The curve can show whether a model succeeds at short dependencies but fails at longer ones, and whether architectures have different length limits.
+The experimental question becomes not only whether a model can use nonlocal information, but how far that ability extends.
 
-The GLoRa paper uses this idea by generating benchmark instances for increasing values of \(d\).
-The intended function asks whether there is a source-to-target path of bounded length with the required node features, and the construction adds alternative paths and holes to prevent simpler shortcut functions from fitting the data.
-The paper then evaluates many systems by increasing \(d\) and observing where accuracy drops toward chance \cite{zhou2025glora}.
-This gives an empirical notion of a system's dependency length limit.
+GLoRa implements this parameterized evaluation by generating benchmark instances for increasing values of \(d\).
+The intended function asks whether there is a source-to-target path of bounded length with the required node features.
+The construction adds alternative paths and holes to prevent simpler shortcut functions from fitting the data.
+The paper evaluates many systems as \(d\) increases and observes where accuracy drops towards chance \cite{zhou2025glora}.
+The resulting curve gives an empirical notion of each system's dependency length limit.
 
-Length as a parameter also clarifies negative results.
-If a model fails at a large value of \(d\), the result is hard to interpret unless the task truly requires dependency length \(d\).
-Failure may only show an expressivity mismatch if the target function lies outside the model class.
-Success may also be misleading if the task contains shortcuts.
-The GLoRa construction addresses both sides.
-Fitting the generated examples should require the specified dependency length, and the intended function should remain expressible by graph neural network systems, including GCNs according to the expressiveness argument used in the paper \cite{barcelo2020logical,zhou2025glora}.
+This interpretation depends on controlling both shortcuts and expressibility.
+If the task does not require dependency length \(d\), success may reflect a shortcut rather than long-range learning.
+If the target function lies outside the model class, failure at a large \(d\) may reflect only an expressivity mismatch.
+The GLoRa construction addresses both conditions.
+Fitting the generated examples should require the specified dependency length.
+At the same time, the intended function should remain expressible by graph neural network systems, including GCNs according to the expressiveness argument used in the paper \cite{barcelo2020logical,zhou2025glora}.
 
-The parameterized view also gives a cleaner way to compare explanations of failure.
+Controlling \(d\) also supports comparisons among explanations of failure.
 Over-smoothing, over-squashing, and vanishing gradients are often discussed as causes of long-range failure \cite{alon2021bottleneck,li2018deeper,glorot2010difficulty}.
-A benchmark with a controlled \(d\) can ask whether performance degrades as the dependency length grows.
-It can then ask whether the suspected cause is present in the same regime.
+A benchmark can first establish whether performance degrades as dependency length grows and then test whether a suspected cause is present in the same regime.
 The GLoRa paper reports that weak performance on its benchmarks cannot be fully attributed to those three causes, which motivates further investigation \cite{zhou2025glora}.
 
-The same reasoning applies beyond GLoRa.
-For any benchmark that claims to test long-range graph learning, it is useful to ask what values of \(d\) are present, how \(d\) is measured, and whether the labels force a dependency of that length.
-If the answer is unknown, the benchmark may still be useful for comparing systems on a practical task.
-It is weaker evidence for the specific claim that a system has learned a long-range dependency.
+Beyond GLoRa, any benchmark that claims to test long-range graph learning should identify the values of \(d\), explain how they are measured, and establish that the labels force dependencies of those lengths.
+A benchmark without this information may still support practical comparisons between systems, but it provides weaker evidence that a system learned a long-range dependency.
 
-\section{How This Chapter Supports the Thesis}
+\section{Implications for Evaluation}
 
-The thesis studies long-range dependency learning through benchmark design.
-The key separation is between the object to be evaluated and the systems that try to learn it.
-A long-range dependency is not just a large graph, a large receptive field, or a source node at large graph distance.
-It is a relation between a target prediction and the distance and path information that makes information at the source node relevant to that prediction.
-In the path-aware view used by GLoRa, the witness is a path \(p=(v_0,\ldots,v_d)\) from source node \(v_0\) to target node \(v_d\).
-The internal nodes of that path are necessary for the target label.
+This chapter has separated the task property to be evaluated from the architecture and learned function used to solve it.
+Graph distance and path length describe available structure, dependency length describes what the target function requires, and receptive-field size describes what an architecture can access.
+In GLoRa's path-aware account, a path \(p=(v_0,\ldots,v_d)\) witnesses the dependency only when its internal nodes are necessary for the target label.
 
 This view has two consequences for the rest of the thesis.
 First, explanations of long-range failure should be evaluated against a precise task requirement.
@@ -360,6 +301,6 @@ Over-smoothing, over-squashing, and vanishing gradients may each harm performanc
 Second, benchmarks should be judged by what their scores certify.
 High accuracy is meaningful evidence for long-range learning only when the benchmark rules out easier fitting functions that do not use the intended dependency.
 
-GLoRa contributes to this methodological need by making \(d\) explicit.
-It constructs node-classification benchmarks where dependency length is chosen in advance, where the source-to-target path is part of the intended function, and where the generated examples are designed to make shortcut solutions insufficient.
-The rest of the thesis can then ask a sharper question: not only which graph learning system performs best, but how long a path-aware dependency the system can learn and what its score certifies.
+GLoRa makes \(d\) explicit in node-classification benchmarks whose dependency length is chosen in advance.
+The source-to-target path is part of the intended function, and the generated examples are designed to make shortcut solutions insufficient.
+The remaining chapters can therefore ask not only which graph learning system performs best, but how long a path-aware dependency it can learn and what that performance certifies.

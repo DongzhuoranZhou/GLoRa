@@ -1,89 +1,75 @@
 \chapter{State of the Art}
 \label{chap:state-of-the-art}
 
-The state-of-the-art question is what existing graph learning methods and benchmarks can show about a dependency whose source node and target node are separated by a specified graph distance.
-Standard message-passing architectures give the local baseline: a node reaches farther only as layers are stacked.
-Depth methods try to make those stacked layers trainable.
-Rewiring and diffusion methods change the graph or the propagation operator so that information is not bound to the original adjacency.
-Graph transformers give nodes broader visibility, but they must add positional or structural encodings to recover graph relations.
-Benchmark work asks whether an evaluation distinguishes the intended long-range dependency from a shorter or more global correlated function.
+This review asks what existing graph learning methods and benchmarks can show about a dependency between a source node and a target node at a specified graph distance.
+Standard message-passing architectures establish the local baseline because their reach grows as layers are stacked.
+Depth methods make more of those layers usable, whereas rewiring and diffusion alter the graph or propagation operator to reduce the cost of distance.
+Graph transformers provide broader visibility but need positional or structural encodings to represent graph relations.
+Benchmark research addresses a different question: whether an evaluation distinguishes the intended long-range dependency from a shorter or more global correlated function.
 
-The GLoRa paper organizes this literature around the same problem.
-It identifies over-smoothing, over-squashing, and vanishing gradients as common explanations for long-range failure, and it reviews methods that target these causes \cite{zhou2025glora}.
+The GLoRa paper links these architectural and evaluative strands by reviewing over-smoothing, over-squashing, and vanishing gradients as common explanations for long-range failure and the methods that target them \cite{zhou2025glora}.
 It also argues that common benchmarks do not certify the dependency length that a system has learned \cite{zhou2025glora}.
-At thesis level, that account becomes a comparison between what each family makes possible and what its results can certify.
-Each section connects one method or benchmark family to its specific evaluation risk.
-The result is a state-of-the-art review in which GLoRa's benchmark design appears as a methodological contribution, not merely as an experimental convenience.
+This chapter therefore compares the assumptions, mechanisms, and evidence of each family rather than treating all long-range improvements as equivalent.
+The comparison positions GLoRa's benchmark design as a methodological contribution that controls what a result can demonstrate.
 
 \section{Standard Message-Passing Architectures}
 \label{sec:sota-standard-gnns}
 
-Standard GNN architectures set the local baseline for long-range graph learning.
-They update a target node by aggregating representations from neighbouring nodes and then computing a new node representation.
-After $L$ message-passing layers, information from a source node at graph distance at most $L$ can in principle affect the target node.
-This locality is the useful inductive bias of message passing, and it also makes dependency length a depth constraint.
-If the label depends on a source node at graph distance $d$, a purely local architecture needs at least $d$ message-passing layers unless the graph is changed or a non-local mechanism is added.
-The standard architectures therefore fix the first evaluation question for GLoRa: did the system use information that local propagation could actually carry from the intended source node to the target node?
+Standard GNN architectures establish the local reach available to long-range graph learning.
+Each layer updates a target node from representations of its neighbours, so after $L$ message-passing layers, information from a source node at graph distance at most $L$ can in principle affect the target node.
+This locality provides the main inductive bias of message passing but also turns dependency length into a depth requirement.
+If a label depends on a source node at graph distance $d$, a purely local architecture needs at least $d$ message-passing layers unless the graph is changed or a non-local mechanism is added.
+The first comparison is therefore about how different local operators carry information once the required source node falls within reach.
 
 \subsection{Convolution and neighbourhood aggregation}
 
-Neighbourhood aggregation made local message passing the default GNN baseline.
-These architectures learn graph representations by repeatedly combining a node's current representation with representations from adjacent nodes.
-Stacking layers extends reach, but the reached information still has to survive every intermediate update.
-For GLoRa, this family separates local access from a stronger claim: that the readout used the intended source node, full dependency length, and required distance and path information.
+Neighbourhood aggregation made local message passing the standard GNN baseline.
+The main architectures share the same one-hop interaction pattern but differ in how they combine neighbouring representations, whether they support inductive use, and which functions they can express.
+Stacking their layers extends reach, while the aggregation and update rules determine what survives the intermediate computations.
 
-Graph Convolutional Networks are the canonical starting point.
-GCN layers average transformed neighbour representations with degree normalization and then apply a non-linearity \cite{kipf2017semi}.
-The design is simple and effective, and it made semi-supervised node classification on citation graphs a standard test case \cite{yang2016revisiting}.
-For long-range learning, the key fact is that the GCN operator is local and repeated.
-Depth increases the receptive field, while each layer also mixes neighbouring node representations.
-For this reason, GCNs serve both as a baseline architecture and as the motivating example for over-smoothing analyses \cite{li2018deeper}.
+Graph Convolutional Networks provide the canonical instance of this pattern.
+A GCN layer averages transformed neighbour representations with degree normalization before applying a non-linearity \cite{kipf2017semi}.
+Its simple and effective design helped make semi-supervised node classification on citation graphs a standard test case \cite{yang2016revisiting}.
+For long-range learning, repeated GCN layers have two linked effects: they expand the receptive field and mix neighbouring node representations.
+GCNs consequently serve both as the local propagation baseline and as the motivating example for analyses of over-smoothing \cite{li2018deeper}.
 
-GraphSAGE keeps the same local structure but changes the inductive setting.
-Rather than learning a separate representation for each node in a fixed graph, it learns an aggregation function that can be applied to new nodes and new graphs.
-Its aggregators can use means, pooling, or recurrent operations over sampled neighbourhoods.
-This sampling-based design makes large graphs more manageable and makes GraphSAGE a natural baseline for inductive graph learning, including the inductive node-classification setting used by GLoRa \cite{hamilton2017graphsage}.
-Sampling does not remove the dependency-length issue.
-If a label depends on a source node at large graph distance, GraphSAGE still needs enough message-passing layers or another mechanism for that source node to affect the target node.
+GraphSAGE retains local aggregation but changes the inductive setting.
+Rather than learning a separate representation for each node in a fixed graph, it learns an aggregation function that can be applied to new nodes and graphs.
+Means, pooling, or recurrent operations combine sampled neighbourhoods, making large graphs more manageable.
+This design makes GraphSAGE a natural baseline for inductive graph learning, including the inductive node-classification setting used by GLoRa \cite{hamilton2017graphsage}.
+Sampling changes the cost of aggregation rather than its reach per layer, so distant source information still requires sufficient depth or a non-local mechanism.
 
 Graph Attention Networks replace fixed normalization with learned attention weights over neighbours.
-Instead of treating all normalized neighbours in the same way, GAT learns how strongly each neighbour should contribute to the target node at a given layer \cite{velickovic2018gat}.
-This gives the model a way to focus on more relevant local messages.
-It does not expand the graph distance available to one message-passing layer, because attention is still applied over the local neighbourhood unless the graph has been rewired or made dense.
-In long-range benchmarks, GAT therefore tests whether local attention helps preserve the label-relevant signal across many message-passing layers.
+GAT learns how strongly each neighbour should contribute to the target node at a given layer instead of treating all normalized neighbours alike \cite{velickovic2018gat}.
+This selection can favour relevant local messages, but attention remains restricted to the local neighbourhood unless the graph is rewired or made dense.
+GAT therefore changes which information is carried at each hop without changing the number of hops needed to cross a given graph distance.
 
-Graph Isomorphism Networks were introduced from an expressivity perspective.
-GIN uses sum aggregation and an update function designed to match the discriminative power of the Weisfeiler-Lehman graph isomorphism test under suitable conditions \cite{xu2019gin}.
-This makes GIN a useful baseline when the concern is not only optimization but also which graph functions a message-passing model can represent.
-For long-range learning, expressivity matters in two directions.
-A benchmark should not reward a model for learning a local shortcut, and it should not require a target function outside the model class being evaluated.
+Graph Isomorphism Networks shift the comparison from aggregation weights to expressivity.
+GIN uses sum aggregation and an update function designed, under suitable conditions, to match the discriminative power of the Weisfeiler-Lehman graph isomorphism test \cite{xu2019gin}.
+It is therefore a useful baseline for asking which graph functions a message-passing model can represent, rather than only whether it can be optimized.
+This distinction matters in both directions: a benchmark should neither reward a local shortcut nor require a target function outside the evaluated model class.
 The GLoRa paper uses this concern explicitly when it argues that the intended function should remain expressible by standard GNN-based systems \cite{barcelo2020logical,zhou2025glora}.
 
 \subsection{Gated and simplified message passing}
 
-Gated and simplified variants change what repeated local propagation keeps.
-Gated models try to keep useful information available while many message-passing layers are applied.
-Simplified propagation asks whether the graph propagation operator alone explains much of a model's performance.
-Both families can improve propagation.
-Neither family certifies that the readout used a source node at the intended graph distance, so GLoRa treats them as systems whose behaviour must be measured on benchmarks with controlled dependency length.
+Gated and simplified variants test two different accounts of repeated local propagation.
+Gated models learn what to retain across message-passing steps, whereas simplified models isolate the contribution of propagation from that of intermediate non-linear transformations.
+Their comparison therefore concerns how much computation is needed once a source node is within the receptive field.
 
 Gated Graph Neural Networks add recurrent-style gating to message passing.
-GGNNs update node representations through gated recurrent units, allowing information to be retained or overwritten across several propagation steps \cite{li2016ggnn}.
-The mechanism matters for long-range learning because a signal from a source node at large graph distance can help only if it remains identifiable after repeated message-passing layers.
-Gating is one architectural answer to that preservation problem.
-It does not specify which source node should be preserved for a given target node.
+GGNNs use gated recurrent units to retain or overwrite node information across several propagation steps \cite{li2016ggnn}.
+This mechanism addresses a preservation problem: information from a distant source node is useful only if it remains identifiable after the intervening updates.
+The gates control retention, while the graph structure still determines where that information can travel.
 
-GatedGCN uses gates on edges within a graph convolutional architecture.
-In the GLoRa experiments, GatedGCN and its residual or dense variants are among the strongest systems on the generated benchmarks \cite{zhou2025glora}.
-This result does not show that gating solves long-range dependency learning in general.
-It suggests that edge-level gating is useful when the target label depends on information along a path.
-A good GLoRa score at moderate dependency length says that gated message passing can learn some controlled path-aware dependencies better than many alternatives, not that it has learned arbitrary long-range dependencies.
+GatedGCN places gates on edges within a graph convolutional architecture.
+GatedGCN and its residual or dense variants are among the strongest systems in the GLoRa experiments \cite{zhou2025glora}.
+Within that controlled setting, the result suggests that edge-level gating helps when a target label depends on information carried along a path.
+The evidence is limited to the generated dependencies and tested lengths, rather than arbitrary long-range dependencies.
 
-Simplified Graph Convolution removes intermediate non-linearities and collapses repeated graph convolution into a simpler propagation followed by a classifier.
-SGC shows that part of the success of graph convolution comes from the propagation operator itself rather than from deep non-linear feature transformation \cite{wu2019sgc}.
-This makes SGC a useful reference point in long-range studies.
-If a simplified propagation model performs well, the task may not require complex layer-wise computation.
-If it fails as graph distance grows, the failure can reveal how much the task depends on preserving a particular signal through repeated propagation.
+Simplified Graph Convolution removes intermediate non-linearities and collapses repeated graph convolution into propagation followed by a classifier.
+SGC shows that part of graph convolution's success comes from the propagation operator rather than deep non-linear feature transformation \cite{wu2019sgc}.
+It thus provides a useful reference for whether a long-range task requires complex layer-wise computation or mainly the transport of a particular signal.
+If its performance falls as graph distance grows, the decline can indicate difficulty in preserving that signal through repeated propagation.
 
 \begin{table}[t]
 \centering
@@ -102,102 +88,73 @@ SGC & Linearized multi-hop graph propagation & Separates propagation depth from 
 GatedGCN & Edge-gated graph convolution & Gates edge-level message passing along paths & \cite{bresson2017residual} \\
 \hline
 \end{tabular}
-\caption{Standard GNN baselines for long-range dependency studies.
-Rows list architectures; columns show the message-passing mechanism, its relevance to dependency length, and the method citation.}
+\caption{Standard GNN baselines.
+Read each row from the message-passing mechanism to its role in long-range learning and its citation.}
 \label{tab:sota-standard-gnns}
 \end{table}
 
-Standard architectures define the baseline problem as local reach plus depth.
-They differ in aggregation, attention, gating, recurrence, and linearization, but they share a common locality.
-A target node cannot use information from a source node at large graph distance until that information has passed through intermediate nodes or the graph structure has been changed.
-Later methods often start from one of these architectures and add a mechanism for depth, rewiring, or non-local message passing.
+Standard architectures define long-range learning first as a problem of local reach.
+Aggregation, attention, gating, recurrence, and linearization change how information survives each hop, but all retain the same locality.
+A source node at large graph distance can affect a target node only after its information has crossed the intermediate neighbourhoods, unless a later method changes the graph or adds non-local interaction.
 
 \section{Depth Methods for Over-Smoothing}
 \label{sec:sota-oversmoothing}
 
-Depth methods try to make many message-passing layers usable.
-They target over-smoothing, where repeated graph propagation makes node representations converge toward similar vectors \cite{li2018deeper}.
-The problem matters because a dependency of length $d$ may require at least $d$ message-passing layers in a local architecture.
-If node representations become indistinguishable before layer $d$, the target node may not retain the source node information needed for the label.
-Depth methods can make deep models trainable.
-They still leave a separate evaluation question: whether the trained model used the intended source node and dependency length.
-GLoRa is motivated by this gap between usable depth and certified use of depth.
+Depth methods address whether the receptive field of a local architecture remains usable as layers are added.
+Their main target is over-smoothing, where repeated graph propagation makes node representations converge towards similar vectors \cite{li2018deeper}.
+A dependency of length $d$ may require at least $d$ message-passing layers, yet the target node may not retain or be able to use the needed source information if representations become indistinguishable before layer $d$.
+These methods therefore seek usable depth through representation control, regularization, skip connections, or flexible propagation.
+GLoRa then tests whether that usable depth suffices for a controlled dependency.
 
-Over-smoothing methods do not all solve the same subproblem.
-They may control the geometry of node representations, regularize the graph or propagation operator, let the final classifier use representations from several depths, or keep shallow information available in deeper propagation.
-Their common goal is to make depth usable.
-The benchmark question is narrower: whether that usable depth leads to learning the intended dependency of a given length.
+The methods differ in what they preserve.
+Normalization controls the geometry of node representations, stochastic regularization slows repeated mixing, skip connections retain shallow information, and layer selection lets the classifier choose among propagation depths.
+Diffusion and implicit formulations go further by replacing a fixed stack of learned transformations with another account of depth.
 
 \subsection{Normalization and stochastic regularization}
 
-Normalization and stochastic regularization try to stop repeated propagation from erasing distinctions between node representations.
-They address the training and representation problem created by deep message passing.
-They can improve long-range performance when source node information would otherwise be mixed away.
-Their limit is specific: they stabilize representations without identifying which source node matters for a target node.
-GLoRa uses controlled dependency length to test what remains after this kind of stabilization is available.
+Normalization and stochastic regularization try to prevent repeated propagation from erasing distinctions between node representations.
+Both can preserve information that would otherwise be mixed away, but they intervene differently: normalization changes representation geometry, whereas stochastic regularization changes the graph seen during training.
 
-PairNorm addresses over-smoothing by controlling the spread of node representations.
-The method normalizes representations so that the average pairwise distance between nodes does not collapse as quickly \cite{zhao2020pairnorm}.
-This targets the symptom that over-smoothing makes different nodes too similar.
-For long-range tasks, PairNorm can help preserve differences along a path.
-It does not decide which source node information should be preserved.
-It is a geometric stabilization method, not a dependency detector.
+PairNorm controls the spread of node representations so that their average pairwise distance does not collapse as quickly \cite{zhao2020pairnorm}.
+It directly targets the geometric symptom of over-smoothing and can preserve differences along a path.
+The method does not select the source information relevant to a particular target node; it keeps representations distinguishable more generally.
 
-DropEdge takes a different approach.
-It randomly removes edges during training so that each layer propagates over a thinned graph \cite{rong2020dropedge}.
-This can slow the repeated mixing that contributes to over-smoothing and can act as regularization for deep GNNs.
-In long-range settings, the effect is ambiguous.
-Removing edges can reduce unwanted mixing.
-It can also remove useful paths if the task depends on a specific path.
-DropEdge is therefore a method that can improve deep training while leaving the benchmark question open.
+DropEdge instead removes edges randomly during training, so each layer propagates over a thinned graph \cite{rong2020dropedge}.
+The thinning can slow repeated mixing and regularize a deep GNN, but its effect on a path-dependent task is conditional.
+It may reduce unwanted mixing or remove a path that carries useful information.
 
-Batch normalization, residual connections, and dense connections are also used in deep graph networks \cite{ioffe2015batch}.
-DeepGCN-style designs adapt ideas from convolutional neural networks, such as residual and dense skip connections, to graph convolution \cite{li2019deepgcns,he2015resnet}.
-These mechanisms help gradients and node representations remain usable through many message-passing layers.
-Gradient-gating methods make the same point from the optimization side: preserving useful training signal can be as important as changing the receptive field \cite{rusch2023gradient}.
-Together, these methods address the practical difficulty of training deep GNNs.
-They do not certify that a deep model is using distant graph evidence, so GLoRa treats depth-oriented methods as systems to evaluate rather than as solutions whose success can be assumed \cite{zhou2025glora}.
+Batch normalization, residual connections, and dense connections provide a third route to deep graph networks \cite{ioffe2015batch}.
+DeepGCN-style designs adapt residual and dense skip connections from convolutional neural networks to graph convolution \cite{li2019deepgcns,he2015resnet}.
+These paths keep gradients and node representations available through many message-passing layers.
+Gradient-gating methods address the same training problem from the optimization side, showing that preserving a useful training signal can matter as much as expanding the receptive field \cite{rusch2023gradient}.
+GLoRa treats these mechanisms as ways to make depth usable and then evaluates what that depth learns \cite{zhou2025glora}.
 
 \subsection{Layer selection and initial residuals}
 
 Layer-selection and initial-residual methods make depth less rigid.
-They let a readout choose among propagation depths or keep initial node features available in deep layers.
-This solves a different part of the over-smoothing problem: the model should not be forced to rely only on the deepest node representation.
-The mechanism can help when different target nodes need information from different graph distances.
-It still does not certify that the selected depth matches the intended dependency length or that the prediction used the required source node.
-GLoRa supplies a benchmark-level check for that correspondence.
+The readout can combine several propagation depths, or deep layers can retain direct access to initial node features.
+This flexibility is useful when target nodes need information from different graph distances because the model is not forced to rely only on its deepest representation.
+On a benchmark with a fixed dependency length, the selected mixture can then be compared with the distance the task requires.
 
-Jumping Knowledge Networks let the readout combine node representations from several intermediate layers.
-Instead of forcing the model to rely only on the deepest representation, JKNet can select or combine information from different neighbourhood ranges \cite{xu2018jknet}.
-This is important because different nodes may need different effective receptive fields.
-In a long-range task, the relevant depth is not only a hyperparameter.
-The correct label may require a signal that arrives only after a specified number of hops.
-JK-style aggregation can keep shallow features available, but the model still has to learn which depth contains the label-relevant information.
+Jumping Knowledge Networks let the readout select or combine node representations from several intermediate layers and thus from different neighbourhood ranges \cite{xu2018jknet}.
+This is important when nodes need different effective receptive fields.
+For a task whose label depends on a specified number of hops, JK-style aggregation keeps shallow features available while asking the readout to find the depth at which the relevant signal arrives.
 
-GCNII directly targets the difficulty of training deep graph convolutional networks.
-It uses initial residual connections that repeatedly reintroduce the input features and identity mapping to reduce the collapse caused by repeated propagation \cite{chen2020simple}.
-This gives each layer access to the original node features and helps very deep models remain trainable.
-For long-range dependency learning, initial residuals have a clear appeal.
-They can keep source node features from being washed out as representations are propagated through the graph.
-Still, a residual path is not a graph path.
-The model must learn to combine preserved local features with information propagated across the graph.
+GCNII combines initial residual connections, which repeatedly reintroduce input features, with identity mapping to reduce the collapse caused by repeated propagation \cite{chen2020simple}.
+Each layer can therefore access the original node features, which helps very deep models remain trainable and keeps source features from being washed out.
+A residual path preserves those features, but the model must still combine them with information propagated along the graph.
 
-APPNP separates prediction from propagation.
-It first computes node-level predictions or representations and then propagates them through a personalized PageRank-style diffusion \cite{gasteiger2019appnp}.
-This design reduces the need to stack many learned transformation layers.
-GPRGNN generalizes this idea by learning the weights assigned to different propagation steps \cite{chien2021adaptive}.
-Both methods treat propagation depth as a controllable mixture rather than a fixed sequence of learned layers.
-This helps avoid some depth pathologies.
-For controlled benchmarks, it also raises a question: if a model can mix many propagation powers, a high score should still be checked against the possibility that a short or global statistic is sufficient.
+APPNP separates prediction from propagation by computing node-level predictions or representations before a personalized PageRank-style diffusion \cite{gasteiger2019appnp}.
+GPRGNN generalizes this design by learning the weights assigned to different propagation steps \cite{chien2021adaptive}.
+Both replace a fixed sequence of learned layers with a controllable mixture of propagation depths, reducing the need for many intermediate transformations.
+On a controlled benchmark, their result must be read in light of which propagation powers the target function actually requires and whether a shorter statistic is sufficient.
 
-DAGNN also decouples transformation and propagation by adaptively aggregating information from multiple propagation depths \cite{liu2020dagnn}.
-It belongs to the same methodological family as APPNP and GPRGNN because it treats depth as a set of channels to combine.
-This is a useful idea for real graphs, where the relevant graph distance may vary across target nodes.
-For a synthetic benchmark with a specified dependency length, the learned depth mixture must be interpreted carefully.
-It may track the required path length, or it may correlate with an easier property.
+DAGNN likewise decouples transformation and propagation by adaptively aggregating information from multiple depths \cite{liu2020dagnn}.
+Like APPNP and GPRGNN, it treats depth as a set of channels to combine, which suits real graphs where relevant distances may vary across target nodes.
+For a synthetic task with a specified dependency length, the learned mixture may track the required path length or an easier correlated property.
 
-Implicit and infinite-depth variants, including IGNN, EIGNN, and graph implicit nonlinear diffusion, treat depth through fixed-point or diffusion-like formulations \cite{gu2020implicit,liu2021eignn,chen2022optimization}.
-Related optimization work argues that better gradients can make simple GCN variants stronger than their depth would suggest \cite{jaiswal2022old}.
+Implicit and infinite-depth variants, including IGNN, EIGNN, and graph implicit nonlinear diffusion, replace an explicit layer stack with fixed-point or diffusion-like formulations \cite{gu2020implicit,liu2021eignn,chen2022optimization}.
+Related optimization work argues that improved gradients can make simple GCN variants stronger than their nominal depth would suggest \cite{jaiswal2022old}.
 
 \begin{table}[t]
 \centering
@@ -214,103 +171,75 @@ Layer-wise readout & JKNet, DAGNN & Combines representations from multiple propa
 Propagation weighting & APPNP, GPRGNN & Separates feature transformation from multi-hop propagation & Learned propagation weights need benchmark-level interpretation \\
 \hline
 \end{tabular}
-\caption{Depth-oriented methods for over-smoothing.
-Rows group methods by how they change deep propagation; columns show representative methods, the changed mechanism, and the evaluation concern.}
+\caption{Depth-oriented methods.
+Read each row from the intervention used to make depth usable to its remaining evaluation concern.}
 \label{tab:sota-oversmoothing}
 \end{table}
 
-The central lesson from this family is that over-smoothing is a real obstacle but not a complete account of long-range failure.
-A method can reduce representation collapse and still fail to learn a controlled path-aware dependency.
-The GLoRa paper makes this point empirically: in its diagnostic experiments, the last-layer representations of strong systems do not show the convergence expected from over-smoothing when accuracy has already fallen \cite{zhou2025glora}.
-This does not refute over-smoothing as a general phenomenon.
-It shows that usable depth and certified use of the intended dependency are different claims.
+Taken together, these methods make depth usable by preserving representation differences, shallow features, gradients, or a choice among propagation scales.
+The GLoRa diagnostics nevertheless find that the last-layer representations of strong systems do not show the convergence expected from over-smoothing when accuracy has already fallen \cite{zhou2025glora}.
+This result does not refute over-smoothing in general; it shows that over-smoothing is not a complete account of failure in the reported setting.
+The family's contribution is therefore usable depth, while the benchmark determines what that depth achieves.
 
 \section{Bottlenecks and Graph Rewiring}
 \label{sec:sota-oversquashing-rewiring}
 
-Bottleneck and rewiring methods treat long-range failure as a graph-structure problem.
-The motivating diagnosis is over-squashing, where too much information must be compressed into fixed-size node representations as it is propagated through narrow parts of the graph \cite{alon2021bottleneck}.
-A target node may depend on many source nodes at large graph distance.
-If the graph gives those source nodes only a small number of source-to-target paths, their information must be compressed through the same limited node representations.
-Adding message-passing layers can increase the number of reachable nodes while also increasing the amount of information compressed through bottlenecks.
-Rewiring can help performance by changing the communication graph.
-The evaluation risk is equally concrete: once the graph semantics change, success may reflect a new shortcut rather than the intended dependency in the original graph.
+Bottleneck and rewiring methods treat long-range failure as a problem in the communication graph.
+They begin from over-squashing, where information from many nodes must be compressed into fixed-size representations while passing through narrow parts of the graph \cite{alon2021bottleneck}.
+Additional layers may bring more source nodes within reach while forcing their information through the same limited source-to-target paths.
+Rewiring addresses this tension by changing the routes available to message passing.
+Its benefit and interpretive cost arise from the same intervention: a better communication graph may no longer preserve the dependency semantics of the original graph.
 
-Rewiring methods change the graph on which message passing runs.
-They may add edges, remove edges, reweight edges, or pass messages through paths that are not original one-hop neighbours.
-The shared idea is to improve information propagation.
-The methodological difference is how the new message-passing structure is chosen.
-Some methods use diffusion, shortest paths, curvature or spectral objectives, or dynamic rewiring during training.
-Other methods, such as Geom-GCN, change the neighbourhood relation by using geometric structure rather than only the raw adjacency \cite{pei2020geomgcn}.
+The communication graph can be changed by adding, removing, or reweighting edges, or by passing messages through relations beyond the original one-hop neighbourhood.
+Methods differ mainly in how they choose this new structure: diffusion, shortest paths, curvature, spectral objectives, or dynamic rewiring during training.
+Geom-GCN, for example, defines neighbourhoods through geometric structure rather than only the raw adjacency \cite{pei2020geomgcn}.
+These choices determine both which bottlenecks are relieved and which graph relations the model ultimately uses.
 
 \subsection{Diffusion and higher-order propagation}
 
-Diffusion and higher-order propagation make distant information available without waiting for one hop per layer.
-They address the fact that one-hop message passing may need many layers to connect a source node and a target node at large graph distance.
-This improves access to distant graph information.
-It can also blur distance and path information.
-For GLoRa, the question is whether a score reflects the intended dependency length or an easier statistic made visible by the new propagation operator.
+Diffusion and higher-order propagation make distant information available without waiting one layer per hop.
+They broaden the propagation operator rather than inserting particular new edges, trading a lower depth cost for a less direct account of distance and path.
 
-DIGL uses graph diffusion to improve graph learning.
-It constructs a diffused graph, often through personalized PageRank or heat-kernel style propagation, so that message passing can use broader structural information than the raw adjacency provides \cite{gasteiger2019diffusion}.
-This can shorten effective graph distance and reduce sensitivity to missing or noisy edges.
-For long-range learning, diffusion is attractive because it gives a node access to information from larger graph distances without stacking as many message-passing layers.
-The tradeoff is that diffusion can blur distance and path information.
-If the task depends on a particular path with particular intermediate features, a smooth diffusion signal may not preserve the information about intermediate nodes on the path.
+DIGL constructs a diffused graph, often through personalized PageRank or heat-kernel-style propagation, so that message passing uses broader structural information than the raw adjacency provides \cite{gasteiger2019diffusion}.
+Diffusion can shorten effective graph distance and reduce sensitivity to missing or noisy edges.
+The resulting smooth signal may, however, blur which path carried the information and which intermediate features occurred on that path.
 
-MixHop mixes powers of the adjacency matrix in a single layer.
-Instead of aggregating only one-hop neighbours at each layer, it can aggregate from several hop distances and combine those channels \cite{abu2019mixhop}.
-This directly expands the receptive field.
-It also makes the model less dependent on depth for reaching nodes at large graph distance.
-Multi-hop aggregation does not automatically encode which intermediate nodes lie on the path.
-A model can receive information from nodes at large graph distance without checking that the required path exists.
-This distinction between access to information at large graph distance and use of a path-aware dependency is central to GLoRa's benchmark design \cite{zhou2025glora}.
+MixHop instead combines powers of the adjacency matrix within one layer, aggregating from several hop distances as separate channels \cite{abu2019mixhop}.
+This directly expands the receptive field and reduces the depth needed to reach distant nodes.
+Because adjacency powers expose endpoints without automatically encoding the intervening nodes, the model can receive distant information without checking that the required path exists.
+GLoRa's benchmark design centres on this distinction between access at large graph distance and use of a path-aware dependency \cite{zhou2025glora}.
 
-FA-GCN, as discussed in the GLoRa paper, is tied to the bottleneck view of Alon and Yahav \cite{alon2021bottleneck}.
-Its role in the long-range literature is to improve the ability of a graph convolutional network to use information at larger graph distances by modifying the message-passing connectivity pattern.
-This kind of method treats graph topology itself as part of the learning architecture.
-For evaluation, the key question is whether topology changes solve the intended task or create access to an easier statistic.
+FA-GCN, as discussed in the GLoRa paper, follows the bottleneck view of Alon and Yahav \cite{alon2021bottleneck}.
+It modifies message-passing connectivity so that a graph convolutional network can use information from larger graph distances.
+The method thereby treats graph topology as part of the architecture, making its result conditional on whether the changed connectivity preserves the intended task or exposes an easier statistic.
 
 \subsection{Shortest paths and distance-aware message passing}
 
-Shortest-path and distance-aware methods reduce the cost of long graph distance by changing which node pairs can interact.
-They address the inefficiency of moving a source node's information to a target node one edge per message-passing layer.
-They can make long-range tasks easier by changing which interactions the architecture can represent.
-That same change means that success does not certify what a strictly local message-passing model would learn on the original graph.
-GLoRa therefore has to state which structural mechanisms are allowed when a model's score is interpreted.
+Shortest-path and distance-aware methods change which node pairs can interact, reducing the cost of moving source information one edge per layer.
+Unlike smooth diffusion, they use an explicit distance or path relation.
+This can make a long-range task easier by changing the interactions represented by the architecture, so comparisons must state which structural mechanisms each system receives.
 
 Shortest Path Networks use shortest-path information for graph property prediction.
-SP-GCN variants use shortest-path based message passing so that information does not have to be propagated only through repeated one-hop neighbourhood aggregation \cite{abboud2022shortest}.
-This directly addresses the fact that a long graph distance can make local message passing inefficient.
-If a model can use selected shortest paths, the effective depth needed for a dependency can be reduced.
-At the same time, shortest-path access changes the hypothesis class.
-A task that is hard for local message passing may become easy for a shortest-path architecture, and this must be reflected when comparing systems.
+SP-GCN variants pass messages along shortest-path-based relations instead of relying only on repeated one-hop aggregation \cite{abboud2022shortest}.
+Selected shortest paths can reduce the effective depth of a dependency, but they also change the hypothesis class relative to local message passing.
+A task that is difficult under the original adjacency may therefore become easy once shortest-path access is part of the architecture.
 
-DRew uses dynamically rewired message passing with delay \cite{gutteridge2023drew}.
-The idea is to change paths for message passing during learning while controlling how messages are delayed across time or layers.
-This family is explicitly motivated by over-squashing and the interaction between graph topology, depth, and message width.
-In the GLoRa experiments, DRew variants are evaluated among systems targeting over-squashing \cite{zhou2025glora}.
-Their inclusion tests whether active rewiring can learn controlled path-aware dependencies better than static local propagation.
+DRew dynamically rewires message passing while controlling how messages are delayed across time or layers \cite{gutteridge2023drew}.
+It is motivated by the interaction among over-squashing, graph topology, depth, and message width.
+The GLoRa experiments include DRew variants among the systems targeting over-squashing, allowing active rewiring to be compared with static local propagation on controlled path-aware dependencies \cite{zhou2025glora}.
 
 \subsection{Curvature and spectral rewiring}
 
 Curvature and spectral rewiring choose new edges from graph geometry or graph spectra.
-They address compression by changing connectivity where the original structure is predicted to restrict message passing.
-These methods can reduce over-squashing.
-They can also alter the structural evidence that a benchmark intended the model to use.
-For GLoRa, a score must be interpreted with respect to both the original dependency length and the changed message-passing structure.
+Both target connectivity where the original structure is predicted to restrict message passing, but one uses a local geometric diagnosis and the other a global spectral one.
+Their scores therefore describe performance under a changed communication structure as well as the original dependency length.
 
-Curvature-based methods use geometric properties of the graph to find bottlenecks.
-SDRF is based on the view that negative curvature and bottleneck structure are connected to over-squashing \cite{topping2022curvature}.
-By rewiring edges according to curvature information, the method tries to make information propagation less congested.
-This is a principled way to alter topology because the rewiring criterion is not learned only from task loss.
-It comes from a graph-geometric diagnosis of where messages are likely to be compressed.
+SDRF uses graph geometry to locate bottlenecks, based on the connection between negative curvature and over-squashing \cite{topping2022curvature}.
+It rewires edges to make propagation less congested according to a graph-geometric diagnosis rather than task loss alone.
 
-FOSR uses first-order spectral rewiring to address over-squashing \cite{karhadkar2023fosr}.
-Rather than relying only on local curvature, it aims to improve spectral properties related to graph connectivity and message propagation.
-Spectral rewiring is attractive because it can target global communication properties.
-It also illustrates a recurring tradeoff.
-Changing global connectivity can make information at large graph distance easier to use, but it can also change the structural evidence that the benchmark intended the model to use.
+FOSR uses first-order spectral rewiring to improve graph connectivity and message propagation \cite{karhadkar2023fosr}.
+Where SDRF diagnoses local geometric bottlenecks, FOSR targets global communication properties through the graph spectrum.
+Improving those properties can make distant information easier to use while changing the structural evidence available to the model.
 
 \begin{table}[t]
 \centering
@@ -329,86 +258,62 @@ Spectral rewiring & FOSR & Improves spectral connectivity related to message pro
 \hline
 \end{tabular}
 \caption{Rewiring and bottleneck-oriented methods.
-Rows list the rewiring mechanism; columns show representative methods, the bottleneck addressed, and the interpretation risk for dependency-length evaluation.}
+Read each row from the changed communication mechanism to the resulting interpretation risk.}
 \label{tab:sota-rewiring}
 \end{table}
 
-Rewiring methods show why long-range learning is not only a question of depth.
-A shallow model on a rewired graph may use information from larger graph distances than a deep model on the original graph, which can be exactly what practical applications need.
-For benchmarks, the same change complicates interpretation.
-If the benchmark claims to test whether a model learns a dependency along the original graph, the evaluation must specify whether rewired edges are allowed, what they mean, and whether they create shortcuts.
+Rewiring shows that long-range learning depends on graph semantics as well as depth.
+A shallow model on a rewired graph may use information from larger original-graph distances than a deep local model, which can be exactly what a practical application needs.
+For a benchmark defined on the original graph, the evaluation must therefore state whether rewired edges are allowed, what relations they encode, and whether they create shortcuts.
 
-The GLoRa paper adds a second point.
-Its directed benchmark construction bounds the number of source-to-target paths independently of the dependency length \cite{zhou2025glora}.
-This makes the main performance drop hard to explain by the usual over-squashing story, which concerns the compression of information from many paths or many nodes at large graph distance.
-The result does not mean that over-squashing is unimportant.
-It means that a controlled benchmark can separate failures caused by graph bottlenecks from failures caused by another mechanism.
+The GLoRa paper also bounds the number of source-to-target paths in its directed benchmark construction independently of dependency length \cite{zhou2025glora}.
+The main performance drop is therefore difficult to explain through the usual over-squashing account, which concerns compression from many paths or many distant nodes.
+This finding does not make over-squashing unimportant; it uses control over graph structure to separate that explanation from other causes of failure.
 
 \section[Graph Transformers]{Graph Transformers and Positional or Structural Encodings}
 \label{sec:sota-transformers}
 
 Graph transformers replace strictly local message passing with broader attention between nodes.
-They address the depth cost of local GNNs, where one hop of graph distance usually requires one message-passing layer.
-In the extreme case, every node can attend to every other node, so a source node and a target node can interact without waiting for many layers.
-This interaction pattern helps with reach.
-It does not certify learning a graph dependency.
-The model still needs graph structure, distance and path information, and the evaluation must show which relation supported the prediction.
-This motivates GLoRa's focus on benchmark control rather than only architectural access to distant nodes.
+When every node can attend to every other node, a source node and a target node can interact without paying one layer per hop.
+This removes the local visibility constraint but not the need to represent graph structure, distance, and path information.
+The central comparison is therefore between making nodes mutually visible and encoding the relations that make their interaction meaningful.
 
 \subsection{Global attention and graph structure}
 
-Global-attention graph transformers make long-distance node interactions easier while trying to preserve graph information.
-The architectural gain is clear: a target node can see far-away nodes without waiting for many local propagation steps.
-The evaluation risk is just as clear.
-Visibility does not prove that the readout used the intended source node, path, or dependency length.
-GLoRa treats broad attention as a mechanism that still needs benchmarks that rule out shortcut functions.
+Global-attention graph transformers make long-distance interactions immediate, but attention alone treats visibility and graph structure as separate problems.
+Their designs differ in how they restore the neighbourhood, position, or structural information that local message passing receives from adjacency.
 
-The original Transformer architecture was designed for sequences and uses attention to let each token interact with other tokens directly \cite{vaswani2017attention}.
-GraphTransformer adapts this idea to graphs \cite{dwivedi2020graphtransformer}.
-Global attention can in principle handle long-range dependencies because graph distance no longer determines the number of layers required for node interactions.
-Graph tasks, however, are not only about interaction range.
-They also depend on structural invariance, neighbourhood relations, and the difference between nodes with similar features but different positions in the graph.
-Without structural information, a transformer may treat a graph too much like an unordered set of node features.
+The original Transformer uses attention to let sequence tokens interact directly \cite{vaswani2017attention}.
+GraphTransformer adapts this interaction pattern to graphs \cite{dwivedi2020graphtransformer}.
+Graph distance no longer determines the number of layers needed for two nodes to interact, but graph tasks also depend on structural invariance, neighbourhood relations, and distinctions between nodes with similar features in different positions.
+Without such information, a transformer can treat the graph too much like an unordered set of node features.
 
-SAN, the Structure-Aware Transformer, addresses this by incorporating spectral information into attention \cite{kreuzer2021san}.
-The method uses Laplacian eigenvectors or related spectral encodings so that the transformer can distinguish structural roles and positions.
-Spectral attention is relevant for long-range learning because eigenvectors encode global graph information.
-They can help a model know where nodes sit in the graph even when direct attention makes all nodes reachable.
-The price is that spectral encodings are themselves choices about which structural information matters.
+SAN, the Structure-Aware Transformer, incorporates spectral information into attention \cite{kreuzer2021san}.
+Laplacian eigenvectors or related encodings distinguish structural roles and positions, giving globally visible nodes information about where they sit in the graph.
+This gain depends on which structural properties the chosen spectral encoding represents.
 
 GraphGPS combines local message passing with global transformer attention \cite{rampasek2022gps}.
-This hybrid design recognizes that local inductive bias and global attention solve different problems.
-The local GNN component captures neighbourhood structure.
-The transformer component gives nodes a global attention channel.
-GraphGPS also uses positional and structural encodings, such as Laplacian positional encoding and random-walk structural encoding, to supply the graph information that attention does not get from sequence order.
+Its local GNN component supplies neighbourhood bias, while the transformer gives nodes a global interaction channel.
+Laplacian positional encoding and random-walk structural encoding add graph information that attention cannot obtain from sequence order.
 
 \subsection{Positional and structural encodings}
 
-Positional and structural encodings supply graph relations to attention-based or hybrid models.
-They address the fact that global attention alone does not tell a model how nodes are positioned or related in the graph.
-Encodings can expose graph distance, random-walk behaviour, centrality, or shortest-path information.
-They can also create shortcuts if the label can be inferred from the encoding without learning the intended dependency.
-GLoRa is motivated by the need to distinguish helpful structural access from certified path-aware dependency learning.
+Positional and structural encodings tell attention-based or hybrid models how nodes are situated and related.
+They may expose graph distance, random-walk behaviour, centrality, or shortest-path information.
+The same information can support the intended relation or act as a shortcut when it correlates with the label, so evaluation must distinguish structural access from use of the path-aware dependency.
 
-Positional encodings give nodes coordinates or signatures derived from the graph.
-Laplacian positional encodings use eigenvectors of the graph Laplacian.
-They provide a global coordinate system up to sign and multiplicity ambiguities.
-For long-range learning, this can make distant structural relations more visible to the model.
-It can also help break symmetries that message passing alone cannot break.
+Positional encodings assign nodes coordinates or signatures derived from the graph.
+Laplacian positional encodings use eigenvectors of the graph Laplacian to provide a global coordinate system, subject to sign and multiplicity ambiguities.
+These coordinates can reveal distant structural relations and break symmetries that message passing alone cannot break.
 
-Random-walk structural encodings summarize how a random walk returns to a node or reaches other nodes over different step lengths.
-They provide a local-to-medium-range structural fingerprint.
-In GraphGPS-style models, random-walk encodings are used together with attention so that nodes include structural context before the attention layer mixes information globally \cite{rampasek2022gps}.
-This is different from message-passing depth.
-The encoding is computed from the graph and supplied as input, so the model need not learn all structural distances through repeated propagation.
+Random-walk structural encodings summarize returns to a node or transitions to other nodes over different step lengths.
+They provide a local-to-medium-range structural fingerprint before attention mixes information globally in GraphGPS-style models \cite{rampasek2022gps}.
+Because the encoding is computed from the graph and supplied as input, the model need not learn all structural distances through repeated message passing.
 
-Shortest-path distances, centrality features, edge encodings, and virtual nodes can also play structural roles.
-They give the model information about graph topology that is not present in raw node features.
-These encodings can be helpful and sometimes necessary.
-They also create evaluation hazards.
-If the label can be inferred from an encoding that correlates with the intended dependency, a model may perform well without learning the dependency itself.
-This is not a defect of positional encoding.
-It is a reason to design benchmarks that distinguish structural access from dependency learning.
+Shortest-path distances, centrality features, edge encodings, and virtual nodes provide other forms of graph topology that raw node features omit.
+Such information can be necessary for a transformer to distinguish graph relations.
+If an encoding also correlates with the label, however, performance may follow the encoding without the intended dependency.
+This is an evaluation condition rather than a defect of positional or structural encoding.
 
 \begin{table}[t]
 \centering
@@ -423,61 +328,47 @@ SAN & Attention guided by spectral structure & Laplacian or spectral encodings &
 GraphGPS & Local GNN plus global attention & LapPE, RWSE, and related encodings & Combines neighbourhood bias with non-local attention \\
 \hline
 \end{tabular}
-\caption{Graph transformer methods in long-range graph learning.
-Rows list transformer families; columns show the node interaction pattern, the supplied structural information, and the long-range issue that remains.}
+\caption{Graph transformer families.
+Read each row by pairing its node interaction pattern with the structural information supplied to it.}
 \label{tab:sota-transformers}
 \end{table}
 
-Graph transformers are therefore not simply ``better long-range GNNs''.
-They change the problem.
-A transformer can let nodes interact across the graph in one layer, but it may need extra encodings to know which graph relations are meaningful.
-A message-passing GNN has graph locality built in, but it pays for that locality with depth.
-Hybrid models try to keep both advantages.
-For this thesis, the evaluation point is that all these systems still need benchmarks that state what dependency has been learned.
-Global attention can make a source node visible to a target node.
-It does not prove that the model used the required path, intermediate features, or dependency length.
+Graph transformers change the long-range problem rather than simply improving a local GNN.
+A message-passing GNN receives graph locality from its adjacency but pays for distance with depth.
+A transformer removes much of that depth cost but needs additional structure to tell it which visible nodes and relations matter.
+Hybrid models combine the two sources of information.
+Their shared evaluation question is whether visibility plus structural encoding leads the model to use the required path, intermediate features, and dependency length.
 
 The GLoRa experiments include GraphTransformer, SAN, and GraphGPS variants with positional encodings \cite{zhou2025glora}.
-The transformer systems perform poorly even at short dependency lengths in the reported setting \cite{zhou2025glora}.
-That result should be read carefully.
-It does not say that graph transformers are generally weak.
-It says that, on this controlled path-aware benchmark and implementation setup, global attention plus structural encoding did not reliably learn the generated dependencies.
-This is the kind of distinction a benchmark should make possible.
+These transformer systems perform poorly even at short dependency lengths in the reported setting \cite{zhou2025glora}.
+The result does not establish that graph transformers are generally weak.
+It shows that, under this controlled path-aware benchmark and implementation setup, global attention plus structural encoding did not reliably learn the generated dependencies.
 
 \section{Real-World Graph Benchmarks}
 \label{sec:sota-real-benchmarks}
 
-Real-world graph benchmarks test methods on practical graph data.
-They ask whether graph learning methods are useful on tasks such as molecules, citation networks, protein interactions, transaction graphs, traffic networks, social networks, and recommendation graphs.
-They are essential because graph learning is ultimately meant to solve practical tasks.
-Real datasets, however, rarely come with a known data-generating function.
-A model's high accuracy can show that the model is useful on that benchmark.
-It cannot usually show that the model used a dependency of a specified graph distance or that the readout relied on a particular source node and target node relation.
-This is the specific limit that motivates GLoRa's synthetic control: practical usefulness is not the same as a controlled target function.
+Real-world graph benchmarks measure practical usefulness on molecules, citation networks, protein interactions, transaction graphs, traffic networks, social networks, and recommendation graphs.
+They are essential because graph learning methods are intended to solve such tasks.
+Their labels rarely come from a known data-generating function, so high accuracy establishes usefulness on the benchmark without usually identifying a dependency of a specified graph distance or a particular source-to-target relation.
+This evidence differs from the controlled target function needed by GLoRa.
 
-Older citation and web-style benchmarks such as Cora, Citeseer, Cornell, and Texas shaped early graph learning practice, but they were not designed to test long-range dependency learning.
-They are useful for comparing methods on standard tasks.
-They are less useful for asking whether a method has learned a dependency along a path of length $d$.
-The labels may be correlated with local features, homophily, degree, community structure, or dataset-specific artifacts.
-When these correlations exist, a local or shallow model can perform well without learning the kind of long-range behaviour this thesis studies.
+Early citation and web benchmarks such as Cora, Citeseer, Cornell, and Texas established standard tasks for comparing graph learning methods, but they were not designed around long-range dependencies.
+Their labels may correlate with local features, homophily, degree, community structure, or dataset-specific artefacts.
+A local or shallow model can exploit those correlations, so performance on these datasets answers a different question from learning a path of length $d$.
 
 TUDataset collects graph classification datasets from several domains \cite{morris2020tudataset}.
-It is useful because it standardized many graph-level benchmarks and made it easier to compare graph kernels and GNNs.
-For long-range dependency learning, it has the same limitation as other real-world collections.
-The benchmark tells us whether a model predicts the labels well.
-It does not certify the dependency length or the form of the dependency used by the fitted function.
+By standardising many graph-level benchmarks, it made comparisons between graph kernels and GNNs easier.
+Its contribution is breadth and comparability rather than control over the dependency length or the function that produces each label.
 
-The Open Graph Benchmark was introduced to provide larger, more realistic, and more standardized graph learning datasets \cite{hu2020ogb}.
-OGB improved evaluation practice by defining public splits, metrics, and tasks at a scale beyond many early benchmarks.
-This matters for long-range learning because small citation graphs can make it hard to separate genuine graph-distance effects from dataset artifacts.
-Still, OGB is not a dependency-length benchmark.
-It can show that a method works well on realistic graph tasks, but the task labels are not designed to guarantee a particular path-aware dependency.
+The Open Graph Benchmark provides larger, more realistic, and more standardised graph learning datasets \cite{hu2020ogb}.
+OGB defines public splits, metrics, and tasks at a scale beyond many early benchmarks.
+This scale matters because small citation graphs can make genuine graph-distance effects difficult to separate from dataset artefacts.
+OGB establishes performance on realistic graph tasks, although its labels are not designed to guarantee a particular path-aware dependency.
 
-The Long Range Graph Benchmark was introduced specifically to evaluate long-range graph learning \cite{dwivedi2022long}.
-LRGB is an important step because it collects tasks where long-range interactions are expected to matter and compares models under a common protocol.
-It also helped focus the field on the gap between local message passing and tasks that require information at larger graph distances.
-The GLoRa paper follows later critiques in noting that some real-world long-range benchmarks may not contain dependencies that are as long or as controlled as the name suggests \cite{zhou2025glora}.
-Even when long-range interactions are plausible, a real-world benchmark cannot usually prove that every fitting function relies on them.
+The Long Range Graph Benchmark focuses specifically on tasks where long-range interactions are expected to matter and compares models under a common protocol \cite{dwivedi2022long}.
+LRGB sharpened attention to the gap between local message passing and tasks that require information from larger graph distances.
+The GLoRa paper follows later critiques in noting that some real-world long-range benchmarks may not contain dependencies as long or as controlled as their framing suggests \cite{zhou2025glora}.
+The tasks can make long-range interactions plausible without proving that every fitting function relies on them.
 
 \begin{table}[t]
 \centering
@@ -488,107 +379,80 @@ Even when long-range interactions are plausible, a real-world benchmark cannot u
 \textbf{Benchmark family} & \textbf{Main value} & \textbf{Long-range limitation} & \textbf{Typical use} \\
 \hline
 TUDataset & Broad collection of graph classification datasets & Unknown target functions and uncontrolled dependency lengths & General graph classification comparison \\
-OGB & Larger standardized datasets, splits, and metrics & Realistic labels do not certify path-aware dependencies & Scalable graph learning evaluation \\
+OGB & Larger standardised datasets, splits, and metrics & Realistic labels do not certify path-aware dependencies & Scalable graph learning evaluation \\
 LRGB & Focus on tasks expected to require long-range interactions & Long-range structure can be hard to prove and may vary by dataset & Comparing models under long-range-oriented protocols \\
 \hline
 \end{tabular}
 \caption{Real-world benchmark families.
-Rows list benchmark families; columns show practical value, the limit for dependency-length claims, and typical use.}
+Read each row from the benchmark's practical value to the scope of its long-range evidence and typical use.}
 \label{tab:sota-real-benchmarks}
 \end{table}
 
-The methodological conclusion is not that real-world benchmarks should be replaced.
-They answer a different question.
-They ask whether a model is useful on a task that people care about.
-Synthetic benchmarks ask whether a model can learn a controlled function under known conditions.
-A mature evaluation practice needs both.
-For this thesis, the central issue is that practical usefulness does not provide the controlled target function needed for claims about long-range dependency length.
+Real-world benchmarks should not be replaced because they answer whether a model is useful on a task of practical interest.
+Synthetic benchmarks instead ask whether a model can learn a controlled function under known conditions.
+Both forms of evidence are needed, but they support different conclusions.
+For this thesis, practical usefulness complements rather than supplies control over long-range dependency length.
 
 \section{Synthetic Long-Range Benchmarks}
 \label{sec:sota-synthetic-benchmarks}
 
-Synthetic long-range benchmarks provide generated graphs with known structure, features, labels, and intended dependency length.
-They supply the control that real-world datasets lack.
-A synthetic generator can choose graph size, graph topology, feature distribution, label function, and the graph distance between the source node and the target node.
-This makes targeted questions possible.
-Can a model preserve source information across a chain?
-Can it match two nodes at large graph distance in a tree?
-Can it detect a connected coloured region in a grid?
-Can it aggregate a maximum value over descendants?
-For GLoRa, these questions matter only if the generator ties the label to the intended path-aware dependency between a source node and a target node and keeps that dependency expressible by the evaluated systems.
+Synthetic long-range benchmarks generate graphs with known structure, features, labels, and intended dependency length.
+Their generators can control graph size, topology, feature distribution, label function, and the distance between the source node and the target node.
+This control supports targeted tests of preserving source information across a chain, matching distant nodes in a tree, detecting connected coloured regions in a grid, or aggregating a maximum over descendants.
+For GLoRa, such a test is informative only when the label depends on the intended path-aware relation and that relation remains expressible by the evaluated systems.
 
 The GLoRa paper argues that synthetic control is necessary but not sufficient \cite{zhou2025glora}.
-A synthetic benchmark can have an intended long-range rule while also admitting a different short-range or global function that fits the generated examples.
-In that case, high accuracy does not show that the model learned the intended dependency.
-The opposite problem can also occur.
-The intended function may really require long-range reasoning, but standard GNN architectures may be unable to express any fitting function for enough generated examples.
-Then poor accuracy does not isolate long-range learning difficulty.
-It may only show that the benchmark is outside the model class.
-GLoRa is motivated by both failure modes: shortcut success and expressivity failure.
+One generator may specify a long-range rule while admitting a short-range or global shortcut function that fits its examples, making high accuracy ambiguous.
+Another may require genuine long-range reasoning while leaving standard GNN architectures unable to express any fitting function for enough generated examples, making poor accuracy ambiguous.
+GLoRa addresses both failure modes by controlling shortcut success and expressivity failure together.
 
 \subsection{Chain and transfer benchmarks}
 
-Chain and transfer benchmarks put information at one position in a chain-like or transfer graph and require it to determine a label at a target node at large graph distance.
-They test whether message-passing layers can make source node information available across an explicit dependency length.
-The GLoRa diagnosis is that some generators also admit global or marked-node functions that fit the examples without using all distance and path information.
-These benchmarks therefore motivate GLoRa's stronger requirement that every fitting function depend on the specified path-aware dependency.
+Chain and transfer benchmarks place information at one position in a chain-like or transfer graph and use it to determine a distant target label.
+They make the separation between source node and target node explicit, providing a direct test of information transfer across message-passing layers.
+Their main risk is not reach but identification: a global or marked-node function may recover the same label without using all distance and path information.
+GLoRa therefore requires every fitting function to depend on the specified path-aware dependency.
 
-Synthetic Chains use directed chains where a node label depends on information at the start of the chain \cite{gu2020implicit}.
-The intuitive long-range demand is clear: the target label must depend on information at the first node.
-The limitation identified in the GLoRa paper is that a fitting function can ignore distance and path information and instead check for a global property of the chain, such as the feature of the unique node without incoming edges \cite{zhou2025glora}.
-This function can fit the examples without relying on all intermediate nodes in the path.
-The benchmark therefore tests a useful propagation ability, but it does not certify the path-aware dependency formalized by GLoRa.
+Synthetic Chains use directed chains in which a node label depends on information at the start of the chain \cite{gu2020implicit}.
+The source-to-target transfer is explicit, but the GLoRa paper identifies a fitting function that ignores distance and path information by checking a global property, such as the feature of the unique node without incoming edges \cite{zhou2025glora}.
+This alternative uses neither all intermediate nodes nor the full path-aware dependency, so the benchmark tests a useful propagation ability without controlling which fitting function provides it.
 
-Graph Transfer and Ring Transfer use ring, crossed-ring, or clique-path structures.
-One node contains class information, and the label at a target node at large graph distance must reproduce that class \cite{digionvanni2023oversquashing,gutteridge2023drew}.
-These benchmarks make the distance between source node and target node explicit.
-The GLoRa paper argues that they have a shortcut similar to Synthetic Chains: the model can use a function that locates the globally marked node and transfers its class without relying on the intended path-aware dependency \cite{zhou2025glora}.
-It also notes that the number of distinct examples can be very small in some versions, which raises the possibility of memorization.
+Graph Transfer and Ring Transfer use ring, crossed-ring, or clique-path structures in which a distant target node must reproduce class information from one marked node \cite{digionvanni2023oversquashing,gutteridge2023drew}.
+Although the source-to-target distance is explicit, the GLoRa paper argues that a function can locate the globally marked node and transfer its class without using the intended path-aware dependency \cite{zhou2025glora}.
+Some versions also contain very few distinct examples, which raises the possibility of memorization.
 
-Conditional Recall is a sequence-like directed-chain task.
-The graph encodes characters, and the label is determined by the first item satisfying a priority rule: a digit if present, otherwise an uppercase letter, otherwise the first character \cite{lukovnikov2021improving}.
-This task is useful because it stresses remembering and selecting information across a chain.
-The GLoRa paper groups it with benchmarks where graph size is limited enough that a fitting function need not demonstrate an unbounded long-range dependency \cite{zhou2025glora}.
+Conditional Recall is a sequence-like directed-chain task whose graph encodes characters.
+Its label is the first item that satisfies a priority rule: a digit if present, otherwise an uppercase letter, and otherwise the first character \cite{lukovnikov2021improving}.
+The task tests memory and selection across a chain, but the GLoRa paper groups it with benchmarks whose bounded graph size lets a fitting function avoid demonstrating an unbounded long-range dependency \cite{zhou2025glora}.
 
 \subsection{Tree and proximity benchmarks}
 
-Tree and proximity benchmarks make graph distance interact with tree structure or an $h$-hop neighbourhood condition.
-They test whether a model can use graph distance together with local colour or feature conditions.
-Their limitation is that the intended rule can be undercut by fitting functions that do not depend on all required path features.
-Bounded graph sizes can also weaken claims about dependency length.
-GLoRa is motivated by generators that rule out those alternative fitting functions while keeping the target function expressible.
+Tree and proximity benchmarks combine graph distance with a tree structure or an $h$-hop neighbourhood condition.
+Unlike simple transfer, the intended rule also depends on local colours, features, or descendant relations.
+The relevant control is therefore whether all required path features affect every fitting function, with bounded graph size posing a second limit on length-parametrised claims.
 
-Tree-Neighbours uses a directed binary tree where the root must match a leaf chosen by a property involving one-hop neighbours \cite{alon2021bottleneck}.
-The intended dependency relates a leaf at large graph distance to the root.
-The GLoRa paper argues that the benchmark can still be fitted by a function that does not rely on the full path-aware dependency \cite{zhou2025glora}.
-The issue is not that the task is trivial.
-The issue is that the generated examples do not rule out all fitting functions that avoid the intended dependency.
+Tree-Neighbours uses a directed binary tree in which the root must match a leaf selected by a property involving one-hop neighbours \cite{alon2021bottleneck}.
+The intended dependency links a distant leaf to the root, yet the GLoRa paper argues that a function can fit the benchmark without relying on the full path-aware dependency \cite{zhou2025glora}.
+The generated examples are therefore non-trivial but do not exclude every alternative fitting function.
 
 h-Proximity uses levelled graphs with red, blue, and uncoloured nodes.
-The target property asks whether all red nodes have at most two blue nodes within an $h$-hop neighbourhood \cite{abboud2022shortest}.
-This directly encodes a distance parameter.
-The limitation is subtler than in a simple chain.
-According to the GLoRa paper, the benchmark can be fitted by a function that does not depend on the features of all nodes along paths between the relevant red nodes and the target \cite{zhou2025glora}.
-It therefore does not meet the path-aware dependency requirement used by GLoRa.
+Its target property asks whether every red node has at most two blue nodes within an $h$-hop neighbourhood \cite{abboud2022shortest}.
+The parameter $h$ directly encodes distance, but the GLoRa paper identifies a fitting function that does not depend on the features of every node along paths between the relevant red nodes and the target \cite{zhou2025glora}.
+The distance condition alone therefore falls short of GLoRa's path-aware dependency requirement.
 
-Tree-Max uses a directed binary tree where each node is labelled by the maximum digit among its descendants and itself \cite{lukovnikov2021improving}.
-This task captures a natural long-range aggregation problem.
-A value from a deep descendant may determine an ancestor's label.
-The GLoRa paper notes that the bounded graph sizes in this benchmark allow solutions that do not establish the kind of length-parametrized dependency guarantee GLoRa seeks \cite{zhou2025glora}.
+Tree-Max uses a directed binary tree in which each node is labelled by the maximum digit among itself and its descendants \cite{lukovnikov2021improving}.
+A deep descendant can determine an ancestor's label, giving the task a natural long-range aggregation rule.
+The GLoRa paper notes that bounded graph sizes permit solutions that do not establish the length-parametrised dependency guarantee sought by GLoRa \cite{zhou2025glora}.
 
 \subsection{Connectivity benchmarks}
 
-Connectivity benchmarks make the label depend on a global structural property of a generated graph.
-They try to force a model to use long-range graph structure rather than a single marked source node.
-Their limitation can be the opposite of shortcut-prone benchmarks: the intended function may be too hard for standard GNN-based systems to express on enough random examples.
-GLoRa is motivated by the need to avoid both problems, so that failure reflects long-range dependency learning rather than an expressivity mismatch.
+Connectivity benchmarks make the label depend on a global structural property rather than a single marked source node.
+This design can avoid the global-marker shortcuts of chain and transfer tasks.
+Its risk lies at the opposite extreme: standard GNN-based systems may be unable to express the intended function on enough random examples, so failure reflects an expressivity mismatch rather than long-range learning alone.
 
-Colour-Connectivity uses two-dimensional grid graphs with red and blue nodes.
-The label depends on whether red nodes form one connected island or two disconnected islands \cite{rampasek2021hierarchical}.
-This benchmark is different from many shortcut-prone tasks.
-The GLoRa paper treats it as a case where the target really does require long-range structure, but where standard GNN-based systems cannot express a fitting function for enough randomly generated examples \cite{zhou2025glora}.
-That creates the opposite evaluation problem.
-If a GNN fails, the failure may come from expressivity limits rather than from an inability to learn a reachable long-range function.
+Colour-Connectivity uses two-dimensional grid graphs with red and blue nodes, labelled according to whether the red nodes form one connected island or two disconnected islands \cite{rampasek2021hierarchical}.
+The GLoRa paper treats this target as genuinely dependent on long-range structure but inexpressible by standard GNN-based systems for enough randomly generated examples \cite{zhou2025glora}.
+Failure can consequently arise from expressivity limits rather than an inability to learn a reachable long-range function.
 
 \begin{table}[t]
 \centering
@@ -605,56 +469,43 @@ Tree-Neighbours & Match the root to a leaf selected by neighbour counts & Can be
 h-Proximity & Check $h$-hop colour conditions around red nodes & Does not require dependence on all path features in the GLoRa sense & \cite{abboud2022shortest} \\
 Colour-Connectivity & Decide whether red grid nodes form one island or two & Requires long-range structure but may be inexpressible for standard GNNs & \cite{rampasek2021hierarchical} \\
 Conditional Recall & Select the first chain symbol satisfying a priority rule & Bounded graph sizes allow non-certifying solutions & \cite{lukovnikov2021improving} \\
-Tree-Max & Propagate the maximum descendant value in a tree & Bounded size weakens claims about length-parametrized dependency learning & \cite{lukovnikov2021improving} \\
+Tree-Max & Propagate the maximum descendant value in a tree & Bounded size weakens claims about length-parametrised dependency learning & \cite{lukovnikov2021improving} \\
 \hline
 \end{tabular}
-\caption{Synthetic long-range benchmarks discussed in relation to GLoRa.
-Rows list benchmarks; columns show the intended rule, GLoRa's limitation diagnosis, and the source citation.}
+\caption{Synthetic long-range benchmarks.
+Read each row from the intended rule to GLoRa's diagnosis of what the generated examples do or do not control.}
 \label{tab:sota-synthetic-benchmarks}
 \end{table}
 
-This review shows why synthetic benchmark design is delicate.
-A long path in each example and a label rule that mentions a distant node still leave the key question open.
-The generator must also rule out easier fitting functions and ensure that the intended function is expressible by the systems being evaluated.
-Otherwise, the benchmark cannot separate architecture failure, optimization failure, expressivity failure, and shortcut success.
+Synthetic control therefore depends on the set of fitting functions, not only on the presence of a long path or distant node in the label rule.
+A generator must rule out easier fitting functions while keeping the intended function expressible by the evaluated systems.
+Only then can its results separate architecture failure, optimization failure, expressivity failure, and shortcut success.
 
 \section{Synthesis: What the State of the Art Leaves Open}
 \label{sec:sota-synthesis}
 
-The state of the art leaves one evaluation gap after the architecture and benchmark literatures are read together.
-Better reach, trainability, or practical accuracy leaves open whether a model learned a specified path-aware dependency between a source node and a target node.
-Standard message-passing architectures define the local computation that most graph learning systems build on.
-Depth-oriented methods try to keep node representations and gradients usable as the number of message-passing layers grows.
-Rewiring methods change graph topology so that message passing can use shorter or less congested paths.
-Graph transformers remove much of the one-hop-per-layer propagation constraint but must reintroduce graph structure through positional or structural encodings.
-Real-world benchmarks test practical usefulness, while synthetic benchmarks can test controlled abilities.
+Read together, the architecture and benchmark literatures leave an evaluation gap between improved capability and evidence of a specified path-aware dependency.
+Standard message-passing architectures establish local reach, and depth-oriented methods keep more of that reach usable.
+Rewiring methods alter graph semantics to provide shorter or less congested communication paths.
+Graph transformers separate global visibility from the positional or structural encodings needed to interpret it.
+Real-world benchmarks establish practical usefulness, whereas synthetic benchmarks can control the target function.
 
-These advances do not automatically answer the same question.
-A method that reduces over-smoothing may still fail when the task requires a particular path-aware dependency.
-A rewired model may perform well because it has created a useful shortcut, not because it has learned the dependency in the original graph.
-A transformer may see all nodes but miss the structural condition that relates them.
-A real-world benchmark may reward a local correlate of the label.
-A synthetic benchmark may contain an intended long-range rule while still admitting a simpler fitting function.
+Each advance changes a different assumption behind a long-range result.
+Reducing over-smoothing improves usable depth, while rewiring changes the graph on which depth is measured.
+Global attention exposes distant nodes, but structural encoding determines how their relations are represented.
+Real-world labels may reward useful local correlates, and synthetic labels may still admit a shortcut function.
+These results are complementary rather than interchangeable.
 
-GLoRa's contribution sits at this methodological boundary.
-It does not propose another architecture for long-range graph learning.
-It proposes a way to test whether a graph learning system can learn a dependency of a specified length under controlled conditions \cite{zhou2025glora}.
-The benchmark generator is designed so that, with high probability and enough examples, every fitting function must rely on a path-aware dependency of the chosen length.
-At the same time, a fitting function remains expressible by standard GNN-based systems \cite{barcelo2020logical,zhou2025glora}.
-This addresses both sides of the benchmark problem.
-The task should not be solvable by a shallow shortcut, and it should not be impossible for the model class by construction.
+GLoRa works at this methodological boundary rather than proposing another long-range architecture.
+It tests whether a graph learning system can learn a dependency of a specified length under controlled conditions \cite{zhou2025glora}.
+With high probability and enough examples, the generator makes every fitting function rely on a path-aware dependency of the chosen length while keeping a fitting function expressible by standard GNN-based systems \cite{barcelo2020logical,zhou2025glora}.
+The task is thus designed to exclude both shallow shortcuts and impossibility by construction.
 
-This perspective also changes how state-of-the-art results should be read.
-The question is not only which architecture obtains the highest score.
-It is what the score demonstrates about the dependency learned by the system.
-On an uncontrolled real-world benchmark, a high score demonstrates usefulness on that benchmark.
-On a shortcut-prone synthetic benchmark, it may demonstrate only that the shortcut was learned.
-On a benchmark whose target function is outside the model class, a low score may demonstrate an expressivity mismatch.
-On a controlled dependency-length benchmark, the result can be interpreted more directly as evidence about the model's ability to learn the specified long-range dependency.
+This perspective makes the meaning of a score depend on the benchmark's controls.
+A high score on an uncontrolled real-world benchmark demonstrates usefulness on that benchmark.
+On a shortcut-prone synthetic benchmark, the same score may show only that the shortcut was learned, while a low score on an inexpressible target may show a mismatch with the model class.
+A controlled dependency-length benchmark supports a more direct interpretation of whether the model learned the specified long-range dependency.
 
-The state of the art therefore motivates GLoRa in two ways.
-First, the range of architectural ideas shows that the field has many plausible mechanisms for long-range graph learning.
-Second, the benchmark limitations show that the field needs sharper evidence about what those mechanisms actually learn.
+The state of the art therefore provides many plausible mechanisms for long-range graph learning but less direct evidence about what those mechanisms learn.
 The rest of the thesis uses this distinction to interpret the included paper.
-Long-range dependency learning is an architectural problem, an optimization problem, and a graph topology problem.
-It is also an evaluation problem.
+Long-range dependency learning concerns architecture, optimization, graph topology, and the design of evidence that separates them.

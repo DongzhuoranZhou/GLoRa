@@ -6,65 +6,64 @@ When a target label depends on a source node many hops away, the system must kee
 The preceding chapters showed that this is not only a modelling problem.
 It is also an evaluation problem: a benchmark score supports a claim about long-range learning only when shortcut functions have been ruled out and the intended function is expressible.
 The included paper contributes GLoRa, a benchmark generator that tests whether a graph learning system can learn a path-aware dependency of a specified length \cite{zhou2025glora}.
-This chapter states what that contribution shows, where its evidence stops, and which research directions follow.
 
 \section{Summary}
 
-The thesis separates two questions that are often combined.
-The modelling question is whether a graph learning system can keep source-node information usable across many message-passing layers.
-The evaluation question is whether a high score shows that the system learned that dependency rather than a shortcut function.
-Over-smoothing, over-squashing, and vanishing gradients are common explanations for long-range failure \cite{li2018deeper,alon2021bottleneck,glorot2010difficulty}.
-The GLoRa result shows that these labels do not explain the controlled failures tested here, even when current systems still break down at modest dependency lengths.
+The thesis establishes that long-range graph learning has separate modelling and evaluation requirements.
+At the modelling level, a graph learning system must keep source-node information usable across many message-passing layers.
+At the evaluation level, a high score must show that the system learned that dependency rather than a shortcut function.
+Over-smoothing, over-squashing, and vanishing gradients are three common explanations for long-range failure \cite{li2018deeper,alon2021bottleneck,glorot2010difficulty}.
 
-A benchmark must identify what the score means.
-Real-world datasets are valuable because they reflect practical domains, but their target functions rarely isolate a dependency length.
-Synthetic datasets can isolate that dependency, but only if they also prevent simpler fitting rules.
-If a model can succeed by counting holes, detecting graph size, recognizing a unique source pattern, or using another shallow feature, then the score is not evidence of the intended path-aware dependency.
+The evaluation analysis establishes the conditions under which a benchmark score supports a claim about long-range learning.
+Real-world datasets reflect practical domains, but their target functions rarely isolate a dependency length.
+Synthetic datasets can isolate that dependency only when they also prevent simpler fitting rules.
+If a model can succeed by counting holes, detecting graph size, recognising a unique source pattern, or using another shallow feature, then the score does not show that it learned the intended path-aware dependency.
 
-GLoRa makes the evaluation question explicit by generating examples for a chosen dependency-length parameter $d$.
+The GLoRa analysis establishes these controls for a chosen dependency-length parameter $d$.
 In the formal notation, an exact dependency is witnessed by a path $p=(v_0,\ldots,v_d)$ in a graph $G=(V,E,\lambda)$, where $v_0$ is the source node and $v_d$ is the target node.
 In the implemented generator, $d$ controls the scale of the sampled source-to-target path, while exact path lengths vary near that value so that length itself is not a class marker.
 The label depends on whether a valid source-to-target path exists and whether its non-source nodes have the required feature pattern.
-Alternative chains and holes keep simpler graph statistics from determining the label.
+Alternative chains and holes prevent simpler graph statistics from determining the label.
 The paper establishes that, with enough generated examples, any fitting function must rely on a dependency of the specified length with arbitrarily high precision and probability \cite{zhou2025glora}.
 
-Control alone would not make GLoRa a useful test.
-The target function must also be representable by the model family being evaluated.
+The expressibility analysis removes a separate ambiguity: control alone would not make GLoRa a useful test.
+The target function must also be expressible by the model family being evaluated.
 The included paper uses known expressiveness results to argue that the intended GLoRa function is expressible by GCNs, and therefore by the GNN-based systems considered in the experiments \cite{barcelo2020logical,zhou2025glora}.
 This separates failure to learn the dependency from the simpler objection that the task lies outside the model class.
 
 Under this controlled test, the evaluated systems still struggle as dependency length grows.
 Performance declines across vanilla GNNs, systems designed to address over-smoothing, systems designed to address over-squashing, and graph transformer systems.
-Most systems fail before $d$ reaches 9, and even the best systems perform poorly beyond length 11.
-Gated-edge systems perform best among the tested models, which suggests that controlled message propagation helps but does not remove the limitation.
-The diagnostics narrow what can explain the drop: target node representations do not collapse, the directed benchmark keeps the number of paths to the target bounded, and measured gradients remain stable.
-These diagnostics do not show that over-smoothing, over-squashing, or vanishing gradients are irrelevant in general.
-They show that those explanations do not account for this particular GLoRa failure pattern.
+Performance drops for most systems before $d=9$, and even the stronger systems perform poorly after $d=11$.
+The stronger performance of gated-edge systems among the tested models makes controlled message propagation a promising direction, but the comparison does not isolate gating as the cause.
+In the tested setting, the inspected traces show no collapse in target node representations and stable measured gradients, while the directed benchmark keeps the number of paths to the target bounded.
+These diagnostics do not support the three standard explanations in the tested setting, but neither do they show that those explanations are irrelevant in general.
 
 \section{Significance}
 
-GLoRa changes the kind of claim a benchmark score can support.
-Many graph benchmarks mainly rank systems by performance on a dataset.
-GLoRa asks instead which values of $d$ a system can handle when the function must use the intended path-aware dependency.
-Without that control, apparent progress in long-range graph learning can be overstated.
-By making dependency length explicit and tying successful fitting to that length, GLoRa makes the evidence behind a score easier to interpret.
+Many graph benchmarks primarily rank systems by aggregate performance on a dataset.
+GLoRa provides a controlled way to evaluate the dependency lengths that a system can learn rather than relying on a single benchmark score.
+A long-range claim should state which dependency the benchmark tests, which shortcut functions have been ruled out, whether the target function is expressible by the evaluated model class, and how performance changes with $d$.
+Without these controls, apparent progress in long-range graph learning can be overstated.
+Length curves, diagnostic plots, and ablations against shortcut variants make such claims easier to interpret than a single aggregate score.
+GLoRa provides one concrete template for this style of reporting.
 
-The benchmark also clarifies the role of synthetic data.
-Synthetic data is limited evidence for deployment because it does not reproduce all properties of real graphs.
-For mechanism and evaluation questions, that limitation is also the source of its value.
+This practice also clarifies the role of synthetic data.
+Synthetic data provides limited evidence for deployment because it does not reproduce all properties of real graphs.
+For questions about mechanisms and evaluation, the same control allows a benchmark to isolate the dependency under study.
 GLoRa does not replace real-world benchmarks.
 It provides a controlled test of whether a system can learn a specific source-to-target path-aware dependency at all.
-That control makes the dependency length, target function, and shortcut analysis visible to the reader.
+Controlled and real-world results should therefore be reported together when possible.
+The controlled task states which dependency the model can learn, while the real task tests whether that ability helps in a practical setting.
 
-The negative empirical result matters because the tested systems include models designed for long-range graph learning.
-Their failure on GLoRa at modest dependency lengths shows that improving depth, graph propagation, or global visibility is not the same as learning the intended path-aware dependency.
+The empirical result changes how architectural progress should be interpreted because the tested systems include models designed for long-range graph learning.
+Their poor performance on GLoRa at modest dependency lengths shows that improving depth, graph propagation, or global visibility is not the same as learning the intended path-aware dependency.
 This does not invalidate those methods, which may improve training, representation quality, or performance on other datasets.
-It does set a sharper evaluation standard: a long-range claim should state what dependency the score supports, not only whether the score is higher.
+It does mean that improvements should be evaluated against the dependency itself, not only against another system's score.
 
-The diagnostics add a second lesson.
-Over-smoothing, over-squashing, and vanishing gradients remain useful concepts, but they should not be default explanations for every long-range failure.
-In the tested GLoRa setting, the expected traces of those explanations are not present.
-The remaining problem is to explain why a model fails to learn an expressible path-aware dependency when the usual diagnostics do not explain the error.
+Long-range failures should be diagnosed by testing the traces predicted by each proposed explanation.
+Over-smoothing, over-squashing, and vanishing gradients remain useful concepts, but attributing a failure to one of them requires the corresponding diagnostic trace.
+In the tested GLoRa setting, the diagnostics do not support these explanations.
+The remaining question is why a model fails to learn an expressible path-aware dependency when the three standard explanations do not account for the error.
 
 \section{Limitations}
 
@@ -87,8 +86,8 @@ The third limitation is feature simplicity.
 The source is marked through one coordinate, normal path nodes through another coordinate, and holes break the path condition.
 This feature design makes the benchmark interpretable and helps isolate shortcut functions.
 It also leaves open how systems behave when relevant information is distributed across richer node features, relation labels, temporal information, or several path conditions.
-The boundary is not that GLoRa is too easy, since many systems still fail.
-The boundary is that its evidence comes from a simple, deliberately controlled target function.
+The fact that many systems still fail shows that this simplicity does not make GLoRa trivial.
+It does mean that the evidence comes from a simple, deliberately controlled target function.
 
 The fourth limitation is empirical scope.
 The paper evaluates many systems, but no experiment can cover all architectures, training regimes, hyperparameter choices, or data scales.
@@ -112,13 +111,17 @@ Future benchmarks should vary the type of certified long-range dependency while 
 They should rule out shortcut functions and keep at least one intended fitting function expressible by the evaluated model family.
 Possible target families include multiple sources, several interacting paths, paths with ordered labels, comparisons between distant nodes, and graph-level labels that depend on a certified long-range structure.
 
-The feature and synthetic-control limitations point to richer controlled tasks.
-One path is to add richer node features, relation labels, temporal information, or multiple path conditions without giving up the shortcut analysis.
-Another is to build semi-synthetic benchmarks by planting certified long-range dependencies into real graph structures.
-A third is to identify real datasets where domain knowledge gives partial control over the relevant source-to-target path, then use GLoRa-style counterexamples to test for shallow alternatives.
-Controlled and real-world results should be reported together when possible: the controlled task states what dependency the model can learn, and the real task tests whether that ability helps in a practical setting.
+The feature-simplicity limitation calls for controlled tasks with richer inputs.
+These tasks could add richer node features, relation labels, temporal information, or multiple path conditions without giving up the shortcut analysis.
 
-The causal limitation calls for stronger diagnostics.
+The synthetic-control limitation motivates a closer connection to real graph structures.
+One direction is to build semi-synthetic benchmarks by planting certified long-range dependencies into real graph structures.
+Another is to identify real datasets where domain knowledge gives partial control over the relevant source-to-target path, then use GLoRa-style counterexamples to test for shallow alternatives.
+
+The empirical-scope limitation calls for evaluating more architectures, training regimes, hyperparameter choices, and data scales under the same controlled protocol.
+Such studies could determine whether performance at larger dependency lengths changes with model design or optimisation, while keeping the resulting claims specific to the systems tested.
+
+The causal-incompleteness limitation calls for stronger diagnostics.
 The next step is to test specific hypotheses about what information a model learns, transports, and loses.
 Useful diagnostics could measure whether models learn a finite-state propagation strategy, preserve source identity across graph distance, align attention heads with valid paths, or confuse alternative chains with the main chain.
 Such diagnostics would move beyond naming a failure mode and toward identifying the mechanism that prevents learning.
@@ -130,20 +133,8 @@ The goal should not be only to increase the number of layers or the graph distan
 It should be to preserve the right information over that distance.
 GLoRa can test whether an architectural idea actually improves the learnable dependency length.
 
-Reporting practice should follow the same standard.
-Long-range graph learning papers should state what dependency a benchmark is meant to test, what shortcut functions have been ruled out, whether the target function is expressible by the evaluated model class, and how performance changes with dependency length.
-A single aggregate score is not enough.
-Length curves, diagnostic plots, and ablations against shortcut variants would make claims easier to interpret.
-GLoRa provides one concrete template for this style of reporting.
-
 \section{Concluding Remarks}
 
-Long-range dependency learning remains difficult for graph neural networks because distant information must remain usable through repeated local updates.
-This thesis argued that the difficulty cannot be understood from model architecture alone.
-A benchmark must also show what dependency a score supports.
-GLoRa provides that test by making dependency length, shortcut functions, and expressibility explicit in a controlled source-to-target path task.
-
-The resulting evidence is deliberately bounded.
-It shows that many current systems fail at modest GLoRa dependency lengths, even though the intended function is expressible and the usual diagnostic traces for over-smoothing, over-squashing, and vanishing gradients are not present in the tested setting.
-It does not show that GLoRa covers all long-range graph functions, or that the final cause of failure is known.
-That is the cumulative contribution of the thesis: it gives long-range graph learning a sharper evaluation object and a clearer set of open questions for future models, diagnostics, and benchmarks.
+The cumulative contribution of this thesis is a bounded standard of evidence, not a universal solution to long-range graph learning.
+For the tested path-aware dependency family, GLoRa links performance to a specified dependency length under shortcut control, establishes that the target function is expressible by the evaluated GNN family, and tests three prominent explanations of failure.
+Within that scope, the thesis turns a broad claim about long-range ability into a result whose meaning, empirical scope, and unresolved cause are explicit.

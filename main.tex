@@ -36,17 +36,17 @@
 Graph neural networks usually compute node representations by passing messages between neighbouring nodes.
 This local mechanism follows the graph structure, but it creates a difficulty when the label of a target node depends on information many hops away.
 Many graph learning systems lose accuracy on such tasks.
-This loss is often explained through over-smoothing, over-squashing, or vanishing gradients.
+This decline is often attributed to over-smoothing, over-squashing, or vanishing gradients.
 
-This thesis studies long-range dependency learning in graph neural networks as an evaluation problem as well as an architectural problem.
-The central question is how to test whether a graph learning system has learned a dependency of a specified length, rather than a shortcut function that fits the same examples.
+This thesis studies long-range dependency learning in graph neural networks as both an architectural and an evaluation problem.
 The included paper introduces GLoRa, a synthetic benchmark generator for this purpose.
-GLoRa creates node-classification tasks parameterized by dependency length.
+GLoRa creates node-classification tasks parameterised by dependency length.
 The tasks are designed so that fitting the generated examples requires learning the intended path-aware dependency.
 
-The extended introduction places GLoRa in the literature on graph neural networks, long-range dependencies, over-smoothing, over-squashing, graph rewiring, graph transformers, and graph learning benchmarks.
-It argues that benchmark performance can be misleading when a task rewards shortcut functions that do not use the dependency it is meant to test.
-For this reason, long-range graph learning must be studied through the benchmarks used to measure it.
+Experiments with GLoRa show that many evaluated graph learning systems fail as dependency length grows.
+In the tested setting, diagnostics for over-smoothing, over-squashing, and vanishing gradients do not fully explain the observed drop.
+
+Together, these findings and the surrounding literature show why benchmark performance can be misleading when a task rewards shortcut functions that bypass the dependency it is meant to test.
 \end{abstract}
 
 \begin{xabstract}[Sammendrag]

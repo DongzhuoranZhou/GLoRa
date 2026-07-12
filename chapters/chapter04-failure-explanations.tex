@@ -1,318 +1,232 @@
 \chapter{Explanations of Long-Range Failure}
 
-Message passing gives a graph neural network a route for graph structure to affect a prediction.
+Message passing gives a graph neural network a route through which graph structure can affect a prediction.
 At each layer, a node combines its previous-layer representation with messages from neighbouring nodes.
-After one layer, the target node can use information from its immediate neighbours.
-After two layers, it can use information from nodes two hops away.
-In the idealized picture, $d$ message-passing layers are enough for source information at graph distance $d$ to affect the target node.
+After one layer, the target node can use information from its immediate neighbours; after two layers, it can use information from nodes two hops away.
+In the idealised picture, $d$ message-passing layers are enough for source information at graph distance $d$ to affect the target node.
 
-Reachability is only the first condition.
-A trained model must carry the relevant source information through successive message-passing layers.
-Its fixed-dimensional node representations must keep that information separate from irrelevant information.
-Training must also send enough gradient signal to early layers, where the source information is first processed.
-When any of these requirements fail, accuracy can fall as the dependency length $d$ increases.
+Reachability, however, is only the first condition.
+A trained model must preserve the relevant source information through successive message-passing layers and keep it separate from irrelevant information in fixed-dimensional node representations.
+Training must also send enough gradient signal to the early layers where the source information is first processed.
+Failure in any of these requirements can cause accuracy to fall as the dependency length $d$ increases.
 
-The literature often explains such drops through three mechanisms: over-smoothing, over-squashing, and vanishing gradients \cite{li2018deeper,alon2021bottleneck,glorot2010difficulty}.
-Over-smoothing predicts representation collapse: node representations become too similar to support the prediction.
-Over-squashing predicts compression through a bottleneck: too much relevant information is forced into a fixed-size representation or through a narrow part of the graph.
-Vanishing gradients predict a weak backward signal: the loss sends too little training signal to the early message-passing layers that must learn what to preserve.
-Each mechanism is plausible in a deep message-passing model, and each has motivated architectural changes in graph learning \cite{zhou2025glora}.
+The literature commonly explains such drops through three mechanisms: over-smoothing, over-squashing, and vanishing gradients \cite{li2018deeper,alon2021bottleneck,glorot2010difficulty}.
+Each mechanism predicts a different internal trace.
+Over-smoothing predicts that node representations converge until they can no longer support the prediction.
+Over-squashing predicts that a bottleneck compresses too much relevant information into a fixed-size representation or through a narrow part of the graph.
+Vanishing gradients predict that the loss sends too little training signal to the early message-passing layers that must learn what to preserve.
+All three mechanisms are plausible in deep message-passing models, and each has motivated architectural changes in graph learning \cite{zhou2025glora}.
 
-This chapter treats those mechanisms as candidate explanations rather than automatic diagnoses.
-The distinction matters because the GLoRa paper studies tasks where the dependency length $d$ is controlled by construction.
-The experiments show that many graph learning systems fail as $d$ grows, even though the intended dependency is expressible by standard message-passing systems and the model has enough message-passing layers for the source information to affect the target node \cite{zhou2025glora}.
-GLoRa then asks whether the failing runs show the internal traces predicted by over-smoothing, over-squashing, or vanishing gradients.
-Its diagnostics do not support those explanations in the tested setting.
-The conclusion is narrow: a long-range accuracy drop is a symptom whose cause must be checked rather than assumed.
+This chapter uses these predicted traces to organise the candidate explanations.
+The GLoRa paper provides a controlled setting because the dependency length $d$ is fixed by construction, the intended dependency is expressible by standard message-passing systems, and the model has enough layers for source information to affect the target node \cite{zhou2025glora}.
+After observing that many systems fail as $d$ grows, GLoRa asks whether the failing runs contain the trace predicted by each mechanism.
+Its diagnostics do not support treating any of the three mechanisms as a complete explanation in the tested setting.
+The conclusion is deliberately narrow: the accuracy drop identifies a failure to learn the dependency, while the internal trace provides evidence for assessing a candidate explanation of that failure.
 
 \section{What a Candidate Explanation Must Explain}
 
-A candidate explanation for long-range failure must identify the internal trace that makes source information unusable at the target node.
-A long-range task is not hard merely because two nodes are far apart in graph distance.
-It is hard when the correct prediction at the target node depends on source information that must survive a sequence of message-passing layers.
-The graph must make the source node reachable from the target node, and the learned computation must use the source information that becomes reachable.
-The dependency length $d$ measures the graph distance, but it does not identify which learning mechanism failed.
-For GLoRa, graph distance sets the challenge, while the diagnosis must come from the model's internal behaviour.
+A candidate explanation for long-range failure must connect the model's behaviour to a mechanism that makes source information unusable at the target node.
+A long-range task is hard when the correct target-node prediction depends on source information that must survive a sequence of message-passing layers, not merely because two nodes are far apart in graph distance.
+The graph must make the source node reachable from the target node, and the learned computation must use the source information once it is reachable.
+Graph distance measures structural separation between the source and target nodes, whereas dependency length $d$ describes what the target function requires; a diagnosis concerns what happens inside the learned computation.
 
-An explanation should therefore predict a trace, not only a low accuracy number.
-It should name the quantity that changes as $d$ increases and explain why that change blocks the target node from using the source information.
-For over-smoothing, the predicted trace is convergence of node representations that should remain distinguishable.
-For over-squashing, the predicted trace is loss of relevant source information when it is compressed through a bottleneck or a fixed-size node representation.
-For vanishing gradients, the predicted trace is a backward signal that becomes too small in the message-passing layers that first process the source information.
+Each candidate explanation therefore needs its own evidence standard.
+For over-smoothing, the relevant trace is convergence between node representations that should remain distinguishable.
+For over-squashing, it is the loss of relevant source information as a graph or representational bottleneck compresses it.
+For vanishing gradients, it is a backward signal that becomes too small in the message-passing layers that first process the source information.
+An explanation must identify how its trace changes as $d$ increases and why that change prevents the target node from using the source information.
 
-This evidence standard is necessary because increasing $d$ changes several things at once.
-The source node is farther from the target node in graph distance.
-The model often needs more message-passing layers so that the target node can receive the source information.
-The number of intermediate message-passing steps grows.
-The messages arriving at the target node can change in distribution.
-The optimization problem can also change because the learned computation is deeper.
-An accuracy curve alone cannot separate these effects.
-It shows that the model failed at a particular dependency length, but it does not identify the mechanism that produced the failure.
+This standard matters because increasing $d$ changes several aspects of the problem at once.
+The source node moves farther from the target node, and the model often needs more message-passing layers to receive its information.
+The source information passes through more intermediate updates, while the messages arriving at the target node can change in distribution.
+The deeper learned computation can also change the optimization problem.
+The accuracy curve identifies the failing runs, but only a mechanism-specific trace can distinguish among these effects.
 
-GLoRa follows this diagnostic standard.
-It constructs benchmarks where the intended solution requires using source information at dependency length $d$.
-It evaluates graph learning systems as $d$ increases.
-It then checks whether the common explanations leave the internal traces they should leave if they caused the drop \cite{zhou2025glora}.
-This structure connects each explanation to evidence.
-It keeps over-smoothing, over-squashing, and vanishing gradients available as real mechanisms while preventing an accuracy drop from being treated as a diagnosis.
+GLoRa follows this sequence explicitly.
+It constructs benchmarks whose intended solution requires source information at dependency length $d$, evaluates graph learning systems as $d$ increases, and then tests the internal traces predicted by the common explanations \cite{zhou2025glora}.
+The following sections apply that sequence to each mechanism in turn: first the mechanism, then its evidence standard, and finally the GLoRa interpretation.
 
 \section{Over-Smoothing}
 
-Over-smoothing predicts a representation trace: node representations that should stay separated collapse toward similar values.
-Many graph neural networks update a node by mixing its current node representation with messages from neighbouring nodes.
-If this mixing continues for many layers, node representations that should encode different information can converge.
-The final classifier may then lose the differences that it needs for node classification \cite{li2018deeper}.
-In GLoRa, the over-smoothing question is whether the accuracy drop at larger $d$ is accompanied by collapse in the target node representations.
+Over-smoothing predicts a representation trace in which node representations that should remain distinct converge towards similar values.
+Many graph neural networks update each node by mixing its current representation with messages from neighbouring nodes.
+Repeated mixing can erase distinctions that the final classifier needs for node classification \cite{li2018deeper}.
+The corresponding GLoRa question is whether the accuracy drop at larger $d$ is accompanied by collapse in the target node representations.
 
-This explanation is plausible in a long-range dependency task because the same depth has two roles.
-The target node needs enough message-passing layers to receive source information from graph distance $d$.
-Those layers also keep mixing node representations across the graph.
-The depth that makes the source information reachable can therefore make relevant node representations less distinguishable.
-For over-smoothing to explain the failure, the trace must be representation convergence, not distance alone.
+This explanation is plausible in a long-range task because depth has two roles.
+The target node needs enough message-passing layers to receive source information from graph distance $d$, but those layers also continue to mix representations across the graph.
+The depth that makes the source information reachable can therefore make relevant representations less distinguishable.
+For over-smoothing to explain the failure, however, this repeated mixing must produce representation convergence.
 
-The predicted trace is concrete.
-Suppose that two examples should receive different labels because their source information differs.
-If message passing preserves that distinction, the final target node representations should differ in a way that the classifier can use.
-If over-smoothing occurs, those final target node representations move toward the same value.
-The classifier then sees nearly the same input for examples that require different outputs.
-The model may have enough message-passing layers in graph-distance terms, but the source information has become unusable for the target node prediction.
+Consider two examples that require different labels because their source information differs.
+If message passing preserves that distinction, their final target node representations should differ in a way that the classifier can use.
+Under over-smoothing, those representations move towards the same value, so the classifier receives nearly identical inputs for examples that require different outputs.
+The model may then have sufficient depth in graph-distance terms even though the source information is no longer usable for the target-node prediction.
 
-Evidence for over-smoothing should therefore come from node representations.
-A strong diagnostic would show that target node representations collapse as the number of message-passing layers or the dependency length $d$ grows.
-For node classification, the most direct place to inspect is the final target node representation before the classifier.
-If positive and negative examples require different predictions but their final target node representations become nearly identical, that supports an over-smoothing explanation.
-The diagnosis is stronger if the convergence appears before the classifier and becomes more severe at larger $d$.
+The direct evidence for over-smoothing should therefore come from node representations.
+For node classification, the most relevant quantity is the final target node representation before the classifier.
+A diagnostic should test whether representations for examples with different labels converge as the number of message-passing layers or the dependency length $d$ grows.
+Convergence that appears before the classifier and becomes more severe at larger $d$ would support the explanation.
 
-Other diagnostics can support the same claim.
-One can measure the variance of node representations across nodes or examples.
-One can compare distances between target node representations for different labels.
-One can test whether methods designed to prevent representational collapse restore both separation and accuracy.
-The important point is that over-smoothing predicts a specific internal symptom.
-The model should fail because node representations that should remain different have become too similar.
+Supporting diagnostics can measure representation variance across nodes or examples, compare distances between target node representations for different labels, or test whether methods designed to prevent collapse restore both separation and accuracy.
+These measurements all address the same predicted trace: representations that should remain different have become too similar.
 
-GLoRa checks that symptom directly.
-The main experiments first show that accuracy drops as $d$ increases for many systems.
-That result is compatible with over-smoothing, but it does not prove over-smoothing.
-The paper therefore inspects last-layer target node representations for the best-performing systems at a short dependency length where accuracy is perfect and at a longer dependency length where accuracy is close to random guessing.
-At the short dependency length, the target node representations for the two labels are clearly separated.
-At the longer dependency length, they are more mixed, as expected from the poor accuracy.
-However, they do not collapse to a single value, and their standard deviation remains substantial \cite{zhou2025glora}.
+GLoRa checks this trace directly after first establishing that accuracy drops as $d$ increases for many systems.
+The paper inspects last-layer target node representations for the best-performing systems at a short dependency length where accuracy is perfect and at a longer dependency length where accuracy is close to random guessing.
+At the short dependency length, representations for the two labels are clearly separated.
+At the longer dependency length, they are more mixed, as expected from the poor accuracy, but they do not collapse to a single value and their standard deviation remains substantial \cite{zhou2025glora}.
 
-This diagnostic narrows the claim to the tested trace.
-In the tested GLoRa setting and for the inspected systems, the observed accuracy drop is not accompanied by the representational convergence that over-smoothing predicts.
-The systems fail, but the final target node representations have not become indistinguishable in the over-smoothing sense.
-Over-smoothing remains a real mechanism in graph learning, but a deep message-passing model and a large dependency length $d$ are not enough to infer it.
-The diagnostic question is whether the node representations actually collapse in the failing runs.
+For the inspected systems in the tested GLoRa setting, the observed degradation therefore lacks the representation convergence predicted by over-smoothing.
+The increased mixing is consistent with poor classification, but it is not the same as collapse to indistinguishable representations.
+This result does not exclude over-smoothing in other settings or under other measurements.
+It limits the GLoRa conclusion to the trace that was inspected: final target node representations do not show the simple collapse needed for over-smoothing to explain these failures.
 
 \section{Over-Squashing}
 
-Over-squashing predicts a compression trace: relevant source information is forced through a channel too narrow to carry it.
-A node representation has fixed dimension, even when the amount of information that could influence the target node grows.
-If many nodes at large graph distance can affect the target node, the model may need to compress many pieces of source information through a small set of intermediate nodes or edges.
-Some of that source information can be lost before it is available to the target node.
-For GLoRa, the over-squashing question is whether longer source-to-target paths create the bottleneck needed to explain the drop.
+Over-squashing predicts a compression trace in which a channel is too narrow to carry all relevant source information.
+A node representation has fixed dimension even when the amount of information that could influence the target node grows.
+If many distant nodes can affect the target node, the model may have to compress their information through a small set of intermediate nodes or edges.
+The corresponding GLoRa question is whether longer source-to-target paths create the bottleneck needed to explain the drop.
 
-The mechanism is most natural on graphs with bottlenecks.
-Consider a target node whose label depends on one source node among many nodes at large graph distance.
-If many possible source nodes must affect the target node through a narrow part of the graph, the intermediate node representations must encode a large amount of information.
-Increasing the dependency length $d$ can make this pressure worse when the number of possible source nodes or directed paths to the target node grows quickly.
-The source node may be reachable in graph-distance terms, but the relevant source information may not fit through the available representation capacity.
+The mechanism is most natural on graphs with structural bottlenecks.
+If a target node's label can depend on one source node among many distant nodes, and their influence must cross a narrow graph cut, intermediate representations must encode a large amount of information.
+Increasing $d$ can intensify this pressure when the number of possible source nodes or directed paths to the target node grows quickly.
+The source node can remain reachable even when the relevant source information does not fit through the available representational channel.
 
-This differs from over-smoothing.
-In over-smoothing, node representations become too similar after repeated mixing.
-In over-squashing, node representations must pack too much distinct information into bounded space.
-A model can suffer from over-squashing even if node representations do not all converge.
-The target node representation may retain variation, while the specific source information needed for the label has been compressed away.
+This mechanism differs from over-smoothing.
+Over-smoothing makes representations too similar through repeated mixing, whereas over-squashing packs too much distinct information into bounded space.
+A model can therefore suffer from over-squashing without its node representations converging.
+The target node representation may retain substantial variation while losing the particular source information needed for the label.
 
-Evidence for over-squashing should focus on bottlenecks and compression.
-A structural diagnostic asks whether many directed paths, or many possible placements of the relevant source node, must affect the target node through a small graph cut.
-A representational diagnostic asks whether increasing the width of node representations improves the model's ability to use source information at large graph distance.
-A graph diagnostic asks whether changing the graph to reduce bottlenecks improves performance while leaving the intended dependency comparable.
-The common requirement is that the evidence connect the failure to compression between the source information and the target node.
+Evidence for over-squashing should establish the bottleneck and connect it to information loss.
+A structural diagnostic can test whether many directed paths, or many possible placements of the relevant source node, must pass through a small graph cut before reaching the target node.
+A representational diagnostic can test whether increasing representation width improves the use of source information at large graph distance.
+A graph intervention can test whether reducing the bottleneck improves performance while keeping the intended dependency comparable.
+In each case, the evidence must tie the failure to compression between the source information and the target node.
 
-Over-squashing has motivated methods that change message passing or the graph.
-Some approaches add, remove, or reweight edges so that message passing can use shorter or less congested paths.
-Others use broader attention patterns, positional information, or rewiring rules that reduce pressure on narrow graph cuts.
+This mechanism has motivated methods that change message passing or the graph.
+Some add, remove, or reweight edges to provide shorter or less congested paths, while others use broader attention patterns, positional information, or rewiring rules that reduce pressure on narrow graph cuts.
 The GLoRa paper groups several evaluated systems according to whether they target over-squashing or related gradient-flow problems \cite{zhou2025glora}.
-These methods matter because they test whether the bottleneck view leads to better long-range learning.
+Their performance tests whether interventions motivated by the bottleneck account improve long-range learning.
 
-GLoRa's main directed construction is designed so that this bottleneck account is not the natural explanation for the observed failure.
-In the directed GLoRa graphs, each example has a bounded number of additional chains, at most $10$, and this bound does not grow with $d$.
-As a result, the number of directed paths leading to the target node is small and independent of the dependency length.
+The main directed GLoRa construction does not create the path growth required by one common bottleneck account.
+Each example has a bounded number of additional chains, at most $10$, and this bound does not grow with $d$.
+The number of directed paths leading to the target node is therefore small and independent of the dependency length.
 The paper argues that this rules out the particular over-squashing story in which an exponential number of directed source-to-target paths is compressed into the target node representation \cite{zhou2025glora}.
 
-The directedness of the construction is essential to that argument.
+Directedness is essential to this argument.
 If the same chain were treated as undirected, message passing could use both edge directions.
-Even a simple chain could then create many possible message-passing walks that end at the target node as the number of message-passing layers grows.
-In that setting, the bounded-directed-path argument would no longer apply.
-The paper explicitly notes this qualification when explaining why over-squashing is not the reason for the main directed GLoRa results \cite{zhou2025glora}.
+As the number of message-passing layers grew, even a simple chain could then generate many possible walks ending at the target node.
+The bounded-directed-path argument would no longer apply, as the paper explicitly notes \cite{zhou2025glora}.
 
-The GLoRa result therefore addresses one specific bottleneck prediction.
-The source node is far from the target node in graph distance, but distance is not the same as congestion.
-When there are only a few directed source-to-target paths and the relevant source information is intentionally simple, an accuracy drop at larger $d$ needs another explanation.
-The model may fail to preserve the source information through repeated message-passing layers, to learn the intended computation, or to optimize a deep composition.
-Those are different claims from over-squashing.
-
-GLoRa therefore uses over-squashing as a candidate explanation with a clear trace.
-If over-squashing causes the drop, the graph construction should force many pieces of relevant information through a narrow representational channel, or methods that reduce such bottlenecks should remove the failure.
-In the main directed benchmarks, the directed path structure does not match that prediction.
-The observed failure remains, so over-squashing is not a complete explanation for those results.
+GLoRa thus tests a specific structural form of over-squashing rather than every possible loss of information.
+The source node is far from the target node, but distance alone does not create congestion.
+In the main directed benchmarks, the path structure does not supply the predicted exponential pressure, yet the failure remains.
+This result shows that the tested bottleneck account is not a complete explanation for the observed degradation; it does not universally exclude other forms of compression.
 
 \section{Vanishing Gradients}
 
-Vanishing gradients predict an optimization trace: the backward signal becomes too weak in the early layers that must learn how to process source information.
+Vanishing gradients predict an optimization trace in which the backward signal becomes too weak in the early layers that must learn how to process source information.
 They occur when the gradient of the loss becomes very small as it is backpropagated through a deep computation.
-In a message-passing graph neural network, the target node prediction may depend on transformations performed by early message-passing layers.
-If the gradient reaching those early layers is close to zero, the model may not learn how to process the source information before later layers propagate it toward the target node.
-For GLoRa, the vanishing-gradient question is whether failures at larger $d$ come with this weak backward signal.
+If the gradient reaching the early message-passing layers is close to zero, those layers may not learn how to process the source information before later layers propagate it towards the target node.
+The corresponding GLoRa question is whether failures at larger $d$ are accompanied by this weak backward signal.
 
 The mechanism is not specific to graphs.
-Deep neural networks are trained by backpropagation, which uses the chain rule.
-When many derivatives are multiplied together, their product can become very small.
-If this happens consistently, early parameters receive weak updates.
-The network may then train slowly or stop improving in the parts of the computation that matter for long-range dependencies \cite{glorot2010difficulty}.
+Backpropagation uses the chain rule, and a product of many derivatives can become very small.
+Early parameters then receive weak updates, so the relevant parts of a deep computation may train slowly or stop improving \cite{glorot2010difficulty}.
 
-Graphs give this optimization problem a message-passing form.
-For a dependency of length $d$, the source information must be processed and propagated through a sequence of message-passing layers before it can affect the target node prediction.
-The loss is computed at the output.
-The gradient must then pass backward through the classifier, through target node updates, and through the intermediate message-passing layers.
-If this backward signal decays with depth, the parameters that first process the source information may learn too little.
-The forward computation may make the source node reachable from the target node, but training may not teach the model to preserve the source information across that computation.
+In a graph neural network, this optimization problem follows the message-passing path.
+For a dependency of length $d$, source information must be processed and propagated through successive layers before it affects the target node prediction.
+The gradient of the output loss must travel backwards through the classifier, the target node updates, and the intermediate message-passing layers.
+If that signal decays with depth, the forward computation can make the source node reachable without teaching the model to preserve its information.
 
-Evidence for vanishing gradients should come from training dynamics.
+Evidence for vanishing gradients should therefore come from training dynamics.
 A direct diagnostic measures gradient norms in early layers as the dependency length $d$ or the number of message-passing layers increases.
-If early-layer gradients shrink toward zero in failing settings, and if that shrinkage is absent in successful shorter settings, the diagnosis becomes plausible.
-One can also test whether techniques known to improve gradient flow restore both gradient magnitude and task accuracy.
-Examples include residual connections, normalization, careful initialization, gating, and adaptive optimization.
-The key point is that the failure should be tied to a weak training signal, not merely to low final accuracy.
+The explanation becomes plausible if early-layer gradients shrink towards zero in failing settings but not in successful shorter settings.
+One can also test whether techniques known to improve gradient flow restore both gradient magnitude and task accuracy, including residual connections, normalization, careful initialization, gating, and adaptive optimization.
+These tests connect the failure to a weak training signal.
 
-GLoRa tests this explanation by measuring weight gradients in the best-performing systems.
-The main paper plots first-layer gradients across training epochs for the inspected systems.
-The gradients remain stable and have magnitudes well above zero.
-The appendix reports similar behaviour for other layers.
+GLoRa measures weight gradients in the best-performing systems.
+The main paper plots first-layer gradients across training epochs, and the appendix reports similar behaviour for other layers.
+The gradients remain stable at magnitudes well above zero.
 The systems also use common techniques against vanishing gradients, including adaptive optimization, initialization, gradient clipping, ReLU activation, and normalization \cite{zhou2025glora}.
 
-These observations make the vanishing-gradient explanation less convincing for the tested GLoRa failures.
-If the main problem were that the backward signal disappeared, the early-layer gradients should show that disappearance.
-Instead, the measured gradients remain nonzero.
-The systems still fail at larger dependency lengths, so the cause must be more specific than a simple vanishing-gradient account.
+These observations weigh against a simple vanishing-gradient account of the tested GLoRa failures.
+If a disappearing backward signal were the main problem, the early-layer gradients should show the corresponding decay towards zero.
+Instead, the measured gradients remain nonzero even though the systems still fail at larger dependency lengths.
 
-The diagnostic has an important limit.
-Stable weight gradients show that training signals exist, but they do not prove that those gradients point toward the intended solution.
-A model can receive gradients and still learn a poor rule.
-Gradients can also be large for parameters that do not help preserve the source information.
-Thus, the absence of vanishing gradients rules out one broad optimization story, but it does not identify the positive mechanism behind the failure.
-It narrows the explanation rather than completing it.
-
-Vanishing gradients therefore remain a candidate explanation rather than a diagnosis of the GLoRa failures.
-The phenomenon is a genuine risk in deep models, and larger dependency length $d$ often requires more message-passing layers.
-But a failure at larger $d$ should not be labelled as vanishing gradients unless the training dynamics show the expected gradient collapse.
-In the GLoRa experiments, they do not.
+The diagnostic has a clear limit.
+Stable weight gradients show that training signals exist, but they do not show that those gradients point towards the intended solution.
+A model can receive gradients and still learn a poor rule, and gradients can be large for parameters that do not help preserve the source information.
+The measurements therefore narrow the explanation without identifying the positive mechanism behind the failure.
+For the inspected systems and layers, they do not support the claim that vanishing gradients account for the observed degradation.
 
 \section{How the Explanations Interact}
 
-Over-smoothing, over-squashing, and vanishing gradients describe different traces inside the same learned system.
-Message passing defines a forward computation from source information to the target node representation.
-Training defines a backward computation from the loss to earlier parameters.
-The three explanations are easiest to discuss separately, but they are not mutually exclusive in a real graph neural network.
-For GLoRa, this means that architectural gains must be interpreted through diagnostic traces, not through the category labels alone.
+Over-smoothing, over-squashing, and vanishing gradients describe different traces within the same learned system.
+Message passing defines a forward computation from the source information to the target node representation, while training defines a backward computation from the loss to earlier parameters.
+The mechanisms can be separated analytically without being mutually exclusive in a graph neural network.
+GLoRa therefore interprets architectural gains through the traces they affect rather than through category labels alone.
 
 Over-smoothing and over-squashing can reinforce each other.
-When many messages are mixed at each layer, the target node representation may lose differences between nodes and also discard details from a particular source node.
-The result can be a representation space where the relevant source information is no longer recoverable, even though node representations have not all collapsed to exactly the same value.
-In that case, increasing representation width may not help if repeated mixing still removes distinctions.
-Likewise, preserving differences between nodes may not help if the graph still forces too much relevant information through a narrow representational channel.
+When each layer mixes many messages, the target node representation may both lose differences between nodes and discard details from a particular source node.
+The relevant source information can then become unrecoverable even though the node representations have not all collapsed to the same value.
+Increasing representation width may not help if repeated mixing still removes distinctions, just as preserving distinctions may not help when a narrow channel still compresses too much relevant information.
 
-Vanishing gradients can interact with both forward failures.
-If gradients become too small in early message-passing layers, the model may never learn transformations that resist over-smoothing.
-It may also fail to learn which source information should be prioritized when a bottleneck is unavoidable.
-Conversely, if forward message passing already destroys the source information, healthy gradient magnitudes do not guarantee success.
-The optimizer can update parameters, but it may still not find a computation that keeps the right source information available at the target node.
+Vanishing gradients can interact with both forward mechanisms.
+If gradients become too small in early message-passing layers, the model may never learn transformations that resist over-smoothing or prioritise source information when a bottleneck is unavoidable.
+Conversely, healthy gradient magnitudes do not guarantee success if the forward computation has already destroyed the source information.
+The optimizer can update the parameters without finding a computation that keeps the right information available at the target node.
 
-These interactions matter when interpreting architectures.
-A residual connection may help gradient flow and also preserve earlier node representations.
-A normalization method may stabilize training and also change how strongly node representations mix.
-A rewiring method may reduce over-squashing and also shorten the effective dependency length $d$.
-A gated message-passing system may help because it controls which messages are propagated, not because it belongs to only one explanation category.
-The GLoRa paper observes that the best-performing systems in the main experiments use gated edges, which suggests that controlled message propagation may be useful, but it does not by itself identify a final mechanism \cite{zhou2025glora}.
+Architectural changes can also affect several traces at once.
+A residual connection may improve gradient flow while preserving earlier node representations, and normalization may stabilize training while changing how strongly representations mix.
+A rewiring method may reduce over-squashing while shortening the effective dependency length $d$.
+A gated message-passing system may help because it controls which messages are propagated rather than because it belongs to a single explanation category.
+The best-performing systems in the main GLoRa experiments use gated edges, which suggests that controlled message propagation may be useful without identifying a final mechanism \cite{zhou2025glora}.
 
-The interaction between explanations is why diagnostic evidence must be specific.
-If a model improves after adding residual connections, the improvement could come from better gradient flow, less representational collapse, easier optimization, or a changed inductive bias.
-If a rewiring method improves performance, the improvement could come from reducing bottlenecks, shortening the effective dependency length, or changing the task in another way.
-Architectural success is valuable, but it is not the same as causal identification.
-GLoRa's diagnostic pattern is to ask which predicted trace is present in the failing run: collapsed node representations, a bottleneck in the directed graph construction, or gradients that vanish during training.
+These overlapping effects make an intervention alone insufficient for causal identification.
+An improvement from residual connections could reflect better gradient flow, less representational collapse, easier optimization, or a changed inductive bias.
+Likewise, an improvement from rewiring could reflect reduced bottlenecks, a shorter effective dependency length, or another change to the task.
+GLoRa therefore asks which trace is present in a failing run: collapsed node representations, a bottleneck in the directed graph construction, or gradients that vanish during training.
 
-\section{Why a Drop with Increasing Dependency Length Is Not a Diagnosis}
+\section{What the Diagnostics Leave Open}
 
-A performance drop with increasing dependency length $d$ is an observation, not a diagnosis.
-It means that the learned function no longer fits the benchmark as the required dependency from source information to target node becomes longer.
-Several mechanisms can produce the same accuracy curve.
-The curve alone does not identify which mechanism occurred.
-For GLoRa, this is the central methodological point: the benchmark exposes controlled long-range failure, but the failure still needs a mechanism-level trace.
+Mechanism-level diagnostics provide asymmetric evidence.
+Finding a predicted trace can support a candidate explanation, although further evidence may still be needed to show that the trace caused the failure.
+Not finding that trace weighs against the tested form of the explanation but does not establish a universal exclusion.
+The accuracy drop serves as the common symptom from which these distinct tests begin.
 
-The ambiguity comes from the design of long-range benchmarks.
-When $d$ increases, the benchmark asks the model to use source information across larger graph distances.
-In many experiments, the number of message-passing layers also increases so that the target node can receive that source information.
-The computation becomes deeper, the source information passes through more intermediate message-passing layers, and the target node aggregates messages after more rounds of mixing.
-Training must also optimize a longer composition of transformations.
-If accuracy drops, any of these changes could be responsible.
+The same distinction applies when comparing systems.
+If a method designed to reduce over-smoothing performs better than a vanilla GNN at larger $d$, the result shows that the method is useful but not that over-smoothing caused the baseline failure.
+The method may also change optimization, effective depth, normalization, parameter count, or message combination.
+Similarly, a gain from rewiring may reflect reduced over-squashing, a shorter effective dependency length, or another change in the computation.
 
-Each standard explanation predicts a different trace.
-Over-smoothing predicts that target node representations for different labels become too similar.
-Over-squashing predicts that the graph or computation forces too much relevant information through a narrow representational channel.
-Vanishing gradients predict that the gradients needed to train early message-passing layers shrink toward zero.
-A single accuracy number contains none of this information.
-It is compatible with all three explanations and with other explanations as well.
+GLoRa applies one test to each proposed mechanism.
+It checks final target node representations for the collapse predicted by over-smoothing, the directed construction for the path growth underlying the tested over-squashing account, and gradients in the inspected layers for decay during training \cite{zhou2025glora}.
+In the main setting, the measured traces do not support the simple forms of these explanations.
+This is stronger than observing inaccuracy, but weaker than identifying the true cause.
 
-The same caution applies when comparing systems.
-Suppose a method designed to reduce over-smoothing performs better than a vanilla GNN at larger $d$.
-That result suggests that the method is useful, but it does not prove that the vanilla model failed because of over-smoothing.
-The method may also change optimization, effective depth, normalization, parameter count, or how messages are combined.
-Similarly, if a rewiring method helps, the reason may be over-squashing, but it may also be that the method has shortened the dependency length that the model actually needs to learn.
-
-GLoRa's conclusion is therefore methodological.
-The paper does not stop after showing that accuracy falls with increasing $d$.
-It asks whether the usual explanations make predictions that are visible in the failing runs.
-For over-smoothing, the paper checks whether the final target node representations collapse.
-For over-squashing, it checks whether the directed construction creates the kind of path explosion required by the bottleneck account.
-For vanishing gradients, it checks whether gradients in the inspected layers vanish during training \cite{zhou2025glora}.
-In the main setting, the measured traces do not match these explanations.
-
-This result prevents a common shortcut in benchmark interpretation.
-It is tempting to see a long-range failure and immediately name one of the standard phenomena.
-The name gives the result a familiar explanation, but it can also hide the fact that the predicted trace has not been checked.
-In the GLoRa experiments, the familiar names do not fully account for the observations.
-The systems fail at larger $d$, but the measured node representations, graph construction, and gradients do not match the simple versions of the three explanations.
-
-The right conclusion is not that the performance drop has no cause.
-It is that these three broad accounts have not identified the cause.
-The model may fail because it does not learn the intended algorithmic rule.
-It may fail because the inductive bias of message passing does not favour the required composition.
-It may fail because optimization finds a shortcut that works for shorter dependencies but does not extrapolate.
-It may fail because the source information is transformed in a way that remains variable but is no longer useful for label prediction.
-These possibilities require further diagnostics.
-They cannot be read directly from the accuracy curve.
+Several explanations therefore remain open.
+The model may not learn the intended algorithmic rule, its message-passing inductive bias may not favour the required composition, or optimization may find a shortcut that works for shorter dependencies but does not extrapolate.
+The source information may also be transformed into a representation that remains variable but no longer supports the label prediction.
+These possibilities require further diagnostics and cannot be distinguished from the accuracy curve alone.
 
 \section{The Role of GLoRa in the Explanation}
 
-GLoRa is useful in this thesis because it separates benchmark performance from mechanistic diagnosis.
-One question is whether a graph learning system performs well on a benchmark.
-Another question is whether that performance shows that the system learned a dependency of length $d$.
-GLoRa is designed so that fitting enough examples requires using the intended long-range dependency, while the intended function remains expressible by standard GNN-based systems \cite{zhou2025glora,barcelo2020logical}.
+GLoRa has two related roles in this thesis.
+As a benchmark, it separates general task performance from evidence that a system learned a dependency of length $d$.
+Its construction is designed so that fitting enough examples requires the intended long-range dependency while that function remains expressible by standard GNN-based systems \cite{zhou2025glora,barcelo2020logical}.
+As a diagnostic setting, it then asks why systems that can express the dependency fail to learn it reliably.
 
-This design makes failures easier to interpret, but it does not explain them by itself.
-When a system fails on GLoRa at larger $d$, the benchmark tells us that the system did not learn the required dependency reliably.
-It does not tell us whether the reason is representational collapse, information compression, weak gradients, or another mechanism.
-The diagnostic part of the paper is essential because it turns the standard explanations into testable hypotheses.
+The benchmark construction makes the failure interpretable without explaining it by itself.
+A failure at larger $d$ shows that a system did not learn the required dependency reliably.
+Determining whether the reason is representation collapse, information compression, weak gradients, or another mechanism requires the separate diagnostic evidence developed in this chapter.
 
-The tests leave GLoRa with a restrained conclusion.
-The diagnostics do not support attributing the observed degradation in the main experiments to over-smoothing, over-squashing, or vanishing gradients.
-This claim is stronger than saying that the systems are inaccurate, but weaker than identifying the true cause.
-It says that the common explanations do not match the evidence available in the tested setting.
+That evidence supports a restrained conclusion.
+For the systems, layers, and directed construction that the paper inspects, the diagnostics do not support attributing the observed degradation to over-smoothing as measured by final representation collapse, the tested directed-path form of over-squashing, or vanishing weight gradients.
+The claim goes beyond reporting low accuracy but stops short of identifying the true cause.
 
-This restrained conclusion is the one needed for the rest of the thesis.
-Over-smoothing, over-squashing, and vanishing gradients remain central concepts in long-range graph learning.
-They explain real risks in deep message passing and organize much of the state of the art.
-GLoRa shows that they should be used as diagnoses only when their predicted traces are present.
-The long-range problem is broader than any one of them.
-Understanding it requires benchmarks that control dependency length $d$ and diagnostics that connect failures to mechanisms.
+This distinction gives the three mechanisms their proper role in the thesis.
+They remain central risks in deep message passing and useful ways to organise the state of the art.
+GLoRa shows why they should be treated as diagnoses only when their predicted traces are present.
+Understanding long-range failure requires both benchmarks that control dependency length $d$ and diagnostics that connect the observed failure to a mechanism.
