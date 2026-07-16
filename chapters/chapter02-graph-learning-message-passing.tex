@@ -1,183 +1,98 @@
-\chapter[Graph Learning and Message Passing]{Graph Learning and Message\\Passing}
+\chapter{Technical Foundations}
 
-The graph-learning arguments in this thesis use a fixed set of graph objects and message-passing operations.
-GLoRa asks whether a target-node prediction uses information from a source node at graph distance $d$.
-Answering this question requires stable names for graphs, neighbourhoods, node representations, layers, and dependency length.
-Together, these definitions connect one-hop computation to two issues: which long-range functions are expressible by an architecture and what a benchmark score can establish.
+This chapter fixes the graph-learning concepts used to define long-range dependency learning in later chapters.
+The progression starts with graph inputs and learning tasks, then moves from local message passing to receptive-field growth.
+It next states the symmetry and expressivity constraints on these models.
+The final section separates information that an architecture can reach from information that a fitted model has learned to use.
 
-Graph inputs are structured objects with nodes, edges, and features rather than fixed-length vectors.
-The order in which nodes are stored in memory should not affect the answer.
-The number of nodes may also change from one example to the next.
+\section{Graphs, Features, and Learning Tasks}
 
-Message-passing graph neural networks are the standard reference point for long-range graph learning \cite{scarselli2008graph}.
-Their local bias comes from applying the same one-hop operation at every node.
-Information from a source node at greater graph distance can reach a target node only through successive message-passing layers.
-Because the local operation is shared across nodes, the same parameters apply to graphs of different sizes.
-Repeated propagation also makes dependency length central to both architecture design and benchmark evaluation rather than only a property of the data.
-
-The notation follows the GLoRa paper closely.
 A graph is written as $G=(V,E,\lambda)$.
-Here $V$ is a finite set of nodes, $E\subseteq V\times V$ is a set of directed edges, and $\lambda:V\to\mathbb{R}^{n}$ maps each node to a feature vector.
-Nodes are denoted by $u,v\in V$.
-An edge $(u,v)\in E$ means that information can be aggregated from $u$ into $v$ under this thesis convention.
-The incoming neighbourhood of $v$ is
+Here $V$ is a finite set of nodes, $E\subseteq V\times V$ is a set of directed edges, and $\lambda:V\to\mathbb{R}^{n}$ maps each node to an input feature vector.
+Nodes are denoted by $u,v,w\in V$.
+The feature of node $v$ is $\lambda(v)$, and $n$ is the input feature dimension.
+
+The edge convention fixes the direction of information flow.
+An edge $(u,v)\in E$ means that information can be aggregated from $u$ into $v$.
+The incoming neighbourhood of $v$ is therefore
 \[
 N(v)=\{u\in V\mid (u,v)\in E\}.
 \]
-The node feature dimension is $n$, and the symbol $d$ is reserved for graph distance and dependency length.
+An undirected edge between $u$ and $v$ is represented by including both $(u,v)$ and $(v,u)$ in $E$.
+The same notation therefore covers directed and undirected graphs without changing the aggregation convention.
 
-\section{Graphs and Features}
+Graph structure and node features provide different parts of the input.
+The edge set determines which nodes are connected and the directions in which information may travel.
+The feature map supplies the values attached to those nodes.
+A target function may depend on either part or on their relation.
 
-The graph $G=(V,E,\lambda)$ records nodes, directed edges, and node features.
-Optional edge features are supplied separately, while directed paths provide the basis for source-to-target graph distance.
-Keeping these objects distinct allows a benchmark to control which source node can affect a target node.
+A directed path of length $d$ is a sequence $p=(v_0,\ldots,v_d)$ such that $(v_{i-1},v_i)\in E$ for every $i$ with $1\leq i\leq d$.
+When a path carries information relevant to a target prediction, $v_0$ is the source node and $v_d$ is the target node.
+The directed graph distance $\operatorname{dist}_G(u,v)$ is the length of a shortest directed path from $u$ to $v$, when such a path exists.
+Path length and graph distance are structural properties of $G$.
+Dependency length is instead a property of what the target function requires, as Chapter 3 defines in detail.
 
-A graph represents objects and relations between objects.
-In a social network, nodes may represent users and edges may represent follows, friendships, or interactions.
-In a molecule, nodes may represent atoms and edges may represent chemical bonds.
-In a traffic network, nodes may represent road segments or intersections and edges may represent permitted connections between them.
-The graph abstraction is useful because it separates the entities from the relation pattern that connects them.
+Graph learning tasks differ by where the prediction is attached.
+Node-level tasks predict a value for a target node, edge-level tasks predict a value for a pair of nodes, and graph-level tasks predict one value for the whole graph.
+Node classification assigns a discrete label to a target node, whereas node regression assigns a real-valued output.
+Binary node classification has two labels, written as True and False in this thesis.
 
-The thesis uses directed edges as the default.
-This choice is not restrictive for undirected graphs.
-An undirected edge between $u$ and $v$ can be represented by including both directed edges $(u,v)$ and $(v,u)$ in $E$.
-The same notation therefore covers both directed and undirected graphs.
-It also covers graphs whose direction is introduced only to control which source nodes can be aggregated into which target nodes.
-
-The map $\lambda:V\to\mathbb{R}^{n}$ gives each node an initial feature vector.
-This vector may encode raw attributes, labels available as input, categorical values after one-hot encoding, continuous measurements, or features produced by a previous model.
-A message-passing model usually starts with $h_v^{(0)}=\lambda(v)$, so the layer-$0$ node representation is the input feature of node $v$.
-All later node representations are learned from these initial features and from the graph structure.
-
-The base notation omits edge features from the graph tuple.
-This keeps $G=(V,E,\lambda)$ compact and matches the GLoRa formalisation.
-When edge features are needed, an additional map can supply them as part of the layer input.
-For example, the map may assign a vector to each directed edge $(u,v)\in E$.
-The message aggregated from $u$ into $v$ may then depend on this edge feature as well as on the node representations of $u$ and $v$.
-Edge features are therefore compatible with message passing, but they enter the computation separately from node features.
-
-Node features describe individual objects.
-Edge features describe relations or interactions.
-For instance, a node feature in a traffic graph may encode the current speed on a road segment, while an edge feature may encode the length, direction, or capacity of a connection between two segments.
-In a molecular graph, a node feature may encode atom type, while an edge feature may encode bond type.
-The model must combine both kinds of information without depending on an arbitrary ordering of the nodes or edges.
-
-Paths connect edge direction to graph distance and dependency length.
-A directed path from $u$ to $v$ of length $d$ is a sequence of nodes $p=(v_0,\ldots,v_d)$.
-The sequence satisfies $v_0=u$, $v_d=v$, and $(v_{i-1},v_i)\in E$ for each $i$ with $1\leq i\leq d$.
-When the path defines a dependency, $v_0$ is the source node and $v_d$ is the target node.
-The graph distance from $u$ to $v$ is the smallest such length $d$, when such a path exists.
-Under the incoming-neighbour convention, information from $u$ can affect $v$ only when there is a directed path from $u$ to $v$.
-
-\section{Graph Learning Tasks}
-
-Graph learning tasks differ by what the model predicts and where that prediction is attached.
-GLoRa is inductive binary node classification, so later benchmark claims concern the target node representation rather than a graph-level readout or a different output task.
-
-Node-level tasks attach a prediction to each target node, whereas graph-level tasks attach one prediction to the whole graph.
-The same graph representation can support both settings, but the final prediction function changes.
-
-In node classification, the model predicts a discrete label for a target node.
-Binary node classification is the special case with two labels, often written as True and False in the GLoRa paper.
-Node regression replaces the discrete label by a real-valued output.
-Both tasks use the target node as the object being labelled, so the model must produce a node representation that is useful at that node.
-
-Graph classification predicts a label for the whole graph, whereas graph regression predicts a real-valued output.
-Both tasks require a graph-level representation rather than only a node-level representation.
-A common approach is to compute node representations for all nodes and then apply a readout function that aggregates the final node representations into one graph vector.
-The graph prediction is then made from that graph vector.
-
-Edge-level tasks are also common, although they are not the main setting of the GLoRa paper.
-An edge classifier predicts a label for a pair of nodes or for an existing edge.
-A link prediction model predicts whether an edge should exist between two nodes.
-These tasks are useful to keep in mind because they show that graph learning is not tied to one output type.
-The same message-passing layers can feed node, edge, and graph predictors.
-
-The distinction between transductive and inductive learning is central.
-In a transductive node task, the training, validation, and test nodes belong to one graph that is already known during training.
-Only some labels are hidden.
-The model can use the full graph structure while learning, even though it cannot use the test labels.
-
-In an inductive task, the model must generalise to new graph instances or to nodes that were not part of the training graph.
-Each example may be a pair $(G,v)$ consisting of a graph and a target node.
-Graph classification is naturally inductive when the training and test sets contain different graphs.
-The GLoRa paper focuses on inductive binary node classification, where each example has a graph, a target node, and a binary label \cite{zhou2025glora}.
-
-The inductive setting is stricter in one respect.
-The model cannot solve the task by memorising node identities in a single graph.
-It must learn a rule that applies across graph instances.
-Shared message-passing layers apply the same learned rule across graphs, while permutation equivariance makes the node outputs follow any relabelling of the input.
+An inductive task requires a learned rule to generalise to graph instances or target nodes not seen during training.
+Each inductive node-classification example may be represented by a graph $G$, a target node $v$, and its label.
+This setting differs from transductive node classification, where training and test nodes belong to a graph whose structure is already available during training.
+GLoRa, the thesis's only included paper, studies inductive binary node classification \cite{zhou2025glora}.
+This scope makes the target node representation the main output used in the chapters that follow.
 
 \section{Message-Passing Graph Neural Networks}
 
-Message-passing layers provide a common computational backbone for node-, edge-, and graph-level tasks.
-Each layer performs one-hop neighbourhood aggregation, so the depth $L$ controls which source nodes can influence a target node representation.
-This relation between depth and distance separates structural impossibility from target functions that are expressible but difficult to learn.
+Message-passing graph neural networks compute node representations through repeated local updates \cite{scarselli2008graph}.
+Each layer aggregates representations from the incoming neighbourhood and combines the result with the node's previous representation.
+The same operation is applied at every node, which lets one set of learned parameters operate on graphs with different numbers of nodes.
 
-Message-passing graph neural networks compute node representations through successive local layers.
-Each layer aggregates the previous-layer representations of a node's neighbours into a message.
-It then combines this message with the previous representation of the node itself.
-After $L$ layers, a classifier or regressor reads the target node representation, while a graph readout aggregates all final node representations.
-
-Let $h_v^{(\ell)}$ be the node representation, or hidden state, of node $v$ after layer $\ell$.
-The initial node representation is
+Let $h_v^{(\ell)}$ denote the representation of node $v$ after message-passing layer $\ell$.
+The initial representation is the input feature:
 \[
 h_v^{(0)}=\lambda(v).
 \]
-A generic message-passing layer first computes
+A generic layer first computes the neighbourhood message
 \[
 m_v^{(\ell)}=\operatorname{Agg}^{(\ell)}\left(\left\{\!\left\{h_u^{(\ell-1)}\mid u\in N(v)\right\}\!\right\}\right),
 \]
 where $\left\{\!\left\{\cdot\right\}\!\right\}$ denotes a multiset.
-The layer then updates the node representation by
+It then updates the node representation by
 \[
 h_v^{(\ell)}=\operatorname{Upd}^{(\ell)}\left(h_v^{(\ell-1)},m_v^{(\ell)}\right).
 \]
 The aggregation and update functions usually contain learnable parameters.
-They are shared across all nodes, which is what lets the same layer operate on graphs with different numbers of nodes.
+The layer index indicates that different layers may use different parameters.
+Within a layer, the same aggregation and update functions are used at every node in $V$.
 
-For node classification, a final classifier maps the last node representation to a label:
+The update equation gives the node direct access to its previous representation.
+An alternative convention adds self-loops and aggregates over $N(v)\cup\{v\}$.
+Both conventions let a node retain or transform its own information while receiving information from its neighbours.
+Under the directed-edge convention, each layer follows the available edges into the target node.
+
+Let $L$ be the number of message-passing layers.
+For node classification, a final classifier maps the target node representation to a predicted label:
 \[
 \hat{y}_v=\operatorname{Cls}\left(h_v^{(L)}\right).
 \]
-For graph classification, a readout function first forms a graph representation:
+For graph-level prediction, an additional readout first forms a graph representation:
 \[
 h_G=\mathrm{Readout}\left(\left\{\!\left\{h_v^{(L)}\mid v\in V\right\}\!\right\}\right).
 \]
-The prediction is then made from $h_G$.
-The readout must also be invariant to node order because the graph has no canonical ordering.
-
-This formalism covers many common GNN architectures.
-They differ in their aggregation functions, update functions, and normalisations.
-Aggregation may use sums, means, maxima, or learned attention weights.
-Updates may introduce gates or residual connections.
-Across these variants, the common structure is one-hop neighbourhood aggregation followed by a shared update of each node representation.
-
-The neighbourhood convention matters.
-With $N(v)=\{u\in V\mid (u,v)\in E\}$, the node representation $h_v^{(\ell)}$ receives information from nodes that have outgoing edges into $v$.
-If the intended application uses the opposite direction, the graph can be built with the opposite edge orientation.
-If the graph is undirected, both orientations are included.
-The mathematical point is that a layer follows the directed edges that are available to it.
-
-Self-information can be handled in two equivalent ways.
-The update above gives $\operatorname{Upd}^{(\ell)}$ direct access to $h_v^{(\ell-1)}$.
-Some architectures instead add self-loops and aggregate over $N(v)\cup\{v\}$.
-Both choices let the node keep or transform its own previous representation.
-The difference is a modelling convention rather than a change in the basic message-passing principle.
+The graph predictor then uses $h_G$ rather than one target node representation.
+The node classifier and graph readout differ in where they attach the output, but both rely on the same sequence of local node updates.
 
 \section{Locality and Receptive Fields}
 
-One-hop neighbourhood aggregation makes the receptive field of a target node grow by one step per layer.
-An $L$-layer model can therefore receive information only from nodes in its directed $L$-hop receptive field.
-The relation between $L$ and dependency length $d$ provides the basis for controlled long-range evaluation.
-
-Locality is the defining property of message passing.
+Locality follows directly from the message-passing equations.
 After one layer, $h_v^{(1)}$ can depend on $\lambda(v)$ and on the initial features of nodes in $N(v)$.
-A second layer can also reach nodes that send messages to those neighbours.
-In general, after $\ell$ layers, the representation of $v$ can depend only on nodes that can reach $v$ by a directed path of length at most $\ell$.
+A second layer can also receive information from nodes with edges into those neighbours.
+After $\ell$ layers, $h_v^{(\ell)}$ can depend only on nodes that reach $v$ by a directed path of length at most $\ell$.
 
 This set is the receptive field of $v$ at layer $\ell$.
-It can be defined recursively as
+It is defined recursively by
 \[
 \mathcal{R}_0(v)=\{v\},
 \]
@@ -185,206 +100,94 @@ and
 \[
 \mathcal{R}_{\ell}(v)=\mathcal{R}_{\ell-1}(v)\cup\{u\mid (u,w)\in E\ \textrm{for some}\ w\in\mathcal{R}_{\ell-1}(v)\}.
 \]
-The node representation $h_v^{(\ell)}$ is a function only of the graph induced by this receptive field, the features inside it, and the parameters of the first $\ell$ layers.
-This statement follows by induction from the layer equations.
+The representation $h_v^{(\ell)}$ is a function only of the graph and features within $\mathcal{R}_{\ell}(v)$ and of the parameters in the first $\ell$ layers.
+This claim follows by induction from the aggregation and update equations.
 
-Locality gives message passing a clear interpretation.
-Each layer increases the maximum graph distance from which the target node representation can use information by one.
-If a source node $u$ is at distance $d$ from a target node $v$ and the model has fewer than $d$ message-passing layers, then $h_v^{(L)}$ cannot depend on $\lambda(u)$.
-This is a structural limitation of the computation graph, not a training problem.
+Each local layer expands the receptive field by at most one directed hop.
+If $\operatorname{dist}_G(u,v)=d$ and $L<d$, then $u\notin\mathcal{R}_L(v)$.
+Changing $\lambda(u)$ while holding the rest of the input fixed cannot then change $h_v^{(L)}$ or $\hat{y}_v$.
+This is a structural limitation of the computation graph rather than a property of training.
 
-When $L\geq d$, information from $u$ can in principle affect $v$.
-This condition provides access to the information, not a guarantee that the model will learn to use it.
-The relevant detail may be weakened by repeated transformations, mixed with other details from the receptive field, or compressed into a node representation that does not preserve what the classifier needs.
-Later chapters discuss over-smoothing, over-squashing, and vanishing gradients as possible explanations for such failures.
-The distinction here is between information reaching the target representation and the model learning to preserve and use it.
+When $L\geq d$, the source node $u$ lies inside the target node's receptive field.
+The architecture then contains a directed computational route by which $\lambda(u)$ may affect $h_v^{(L)}$.
+This condition establishes structural reachability only.
+It does not establish that the aggregation and update functions preserve the relevant information or that the classifier uses it.
 
-The depth-distance relation makes dependency length operational for GNN evaluation.
-A task has a dependency of length $d$ when the correct prediction at a target node depends on information carried by a source-to-target path of length $d$.
-The GLoRa paper formalises this idea using constructed source-to-target paths and uses it to build benchmark examples \cite{zhou2025glora}.
-Evaluating such a task requires establishing not only that a model reaches high accuracy, but also that the learned function uses the intended path.
+Depth and dependency length therefore play different roles.
+Depth $L$ bounds the structural range of a local message-passing computation.
+Dependency length states how far the target function requires relevant information to matter.
+A model needs enough depth to reach the required information, but sufficient depth alone does not make the fitted prediction depend on that information.
 
-\section{Permutation Equivariance and Invariance}
+\section{Symmetry and Expressivity}
 
-Locality constrains which nodes can affect a prediction, while permutation symmetry constrains how the model may use them.
-Because node order has no meaning, node-level predictions should follow a relabelling and graph-level predictions should remain unchanged.
-Long-range claims can then depend on graph structure and node features rather than on storage order.
+Graphs have no canonical node order.
+Relabelling the nodes changes their representation in memory but not the underlying graph input.
+Node-level outputs should follow this relabelling, while a graph-level output should remain unchanged.
 
-The same graph can be stored as an adjacency list, an adjacency matrix, or an edge list, with its nodes listed in many different orders.
-Changing this order changes only the representation in memory, not the mathematical input.
-Graph learning models therefore need a symmetry property that ordinary fixed-vector neural networks do not enforce automatically.
-
-For node-level tasks, the required property is permutation equivariance.
-Let $\pi$ be a relabelling of the nodes.
-The relabelled graph $G^\pi$ has edges $(\pi(u),\pi(v))$ whenever $(u,v)\in E$, and the feature of $\pi(v)$ is the original feature of $v$.
-A node predictor $F$ is equivariant when
+Let $\pi$ be a permutation of $V$.
+The relabelled graph $G^\pi$ contains an edge $(\pi(u),\pi(v))$ whenever $(u,v)\in E$, and node $\pi(v)$ receives the feature $\lambda(v)$.
+A node predictor $F$ is permutation equivariant when
 \[
 F(G^\pi)_{\pi(v)}=F(G)_v
 \]
-for every node $v$.
-Relabelling the input relabels the output in the same way.
+for every node $v$ and every permutation $\pi$.
+Relabelling the input then relabels the node-level output in the same way.
 
-For graph-level tasks, the required property is permutation invariance.
-A graph predictor $R$ is invariant when
+A graph predictor $R$ is permutation invariant when
 \[
 R(G^\pi)=R(G)
 \]
-for every relabelling $\pi$.
-The output is attached to the whole graph, so there is no node index to relabel.
-The prediction must be the same for every representation of the same graph.
+for every permutation $\pi$.
+The graph-level output has no node index, so relabelling must leave it unchanged.
 
-Message passing achieves equivariance through two design choices.
-First, the same aggregation and update functions are used at every node.
-Second, aggregation treats the neighbours as a multiset rather than as an ordered sequence.
-If the neighbours of $v$ are listed in a different order, a sum, mean, max, or other symmetric multiset aggregation returns the same result.
-The updated node representation is therefore tied to the graph structure and features, not to the storage order.
+Message passing is equivariant when every node uses the same update function and the aggregation function treats its inputs as a multiset.
+Changing the order in which neighbours are stored then leaves each aggregated message unchanged.
+Applying a permutation-invariant readout to the final multiset of node representations produces an invariant graph representation.
+These symmetry properties let the prediction depend on graph structure and features without depending on storage order.
 
-Graph-level invariance usually comes from an invariant readout.
-A readout based on a sum, mean, maximum, or learned multiset function does not depend on the order of the final node representations.
-This makes the graph prediction stable under node relabelling.
-The price is that the model can distinguish graphs only through information preserved by the equivariant node layers and the invariant readout.
+Expressivity describes which input-output functions a model class can represent.
+A target function is expressible by a model class if some setting of the model parameters realises that function.
+Expressibility is therefore a property of the model class and target function, not of a particular training run.
 
-Permutation symmetry also shapes which functions are expressible by a graph model.
-A node classifier cannot depend on a node's arbitrary input position unless that position is encoded as a feature.
-A graph classifier cannot distinguish two graphs that are identical up to relabelling unless their features or structure differ in a permutation-invariant way.
-This restriction is desirable because graph identity should not depend on storage order.
-It is also part of the expressivity analysis of graph neural networks.
+Locality gives the first expressivity limit.
+The target representation $h_v^{(L)}$ can depend only on the graph structure and features inside $\mathcal{R}_L(v)$.
+An $L$-layer local message-passing model therefore cannot express a node-classification function whose output at $v$ changes when only information outside this receptive field changes.
+No parameter setting can create a computational route from that information to $h_v^{(L)}$.
 
-\section{Standard Architectures at a Conceptual Level}
+Even within the receptive field, a particular architecture may map inputs that the target function must distinguish to the same representation.
+An aggregation function can map distinct neighbourhood multisets to the same message.
+Once two inputs have produced the same intermediate representation, later layers cannot recover the distinction from that representation alone.
+Permutation symmetry also prevents a model from using an arbitrary storage position as a node identifier unless that identifier is supplied as a feature.
+Logical and combinatorial analyses formalise related limits on which rooted nodes and graphs message-passing architectures can distinguish \cite{barcelo2020logical}.
 
-Common graph neural network architectures differ in the mechanism they change: aggregation, update, gating, propagation depth, or connectivity.
-For long-range evaluation, the crucial distinction is whether a method improves propagation along the original edges or changes the effective graph distance through a new connectivity pattern.
+Learnability is a separate question.
+It asks whether a training procedure can use the available data and finite resources to find parameters that realise or approximate an expressible target function.
+If the target function is not expressible, no training procedure can realise it exactly.
+Failure to realise it exactly therefore does not test learnability.
+If the target function is expressible, successful training is still not guaranteed.
+An evaluation intended to isolate learnability must therefore establish expressibility before it interprets training success or failure.
 
-The original graph neural network model introduced the idea of learning node representations through repeated message-passing layers \cite{scarselli2008graph}.
-Modern architectures differ in how they instantiate the aggregation and update steps.
-The comparison below focuses on the computational choices that matter for locality and expressivity.
+\section{From Reachability to Use}
 
-Graph convolutional networks use a normalised average of neighbouring representations followed by a learned linear transformation and a nonlinearity \cite{kipf2017semi}.
-The normalisation controls the scale of messages from nodes with different degrees.
-Its local averaging also makes the smoothing effect of message passing especially visible.
+The preceding definitions separate three claims about a target-node prediction.
+Structural reachability asks whether the relevant input lies inside the target node's receptive field.
+Expressibility asks whether some parameter setting in the model class can compute the required target function.
+Demonstrated use is distinct from learnability: it asks whether the fitted predictor actually depends on the relevant input.
 
-GraphSAGE was designed with inductive learning in mind.
-It builds node representations by aggregating sampled neighbourhood information and combining it with the node's previous representation.
-Different variants use mean, pooling, or recurrent aggregators.
-The sampling idea reduces computation on large graphs and supports generalisation to nodes and graphs not seen during training.
-For this reason, GraphSAGE is a natural reference point for inductive graph learning \cite{hamilton2017graphsage}.
+These claims are not equivalent: reachability does not establish expressibility, and expressibility does not establish demonstrated use.
+A source node outside $\mathcal{R}_L(v)$ is unreachable by an $L$-layer local model.
+A source node inside $\mathcal{R}_L(v)$ is reachable, but the model class may still merge inputs that the target function must distinguish.
+Even when the target function is expressible, the training procedure may return parameters whose prediction ignores the source information.
 
-Graph attention networks replace fixed aggregation weights by learned attention weights.
-For a target node $v$, the model scores neighbours $u\in N(v)$ and uses these scores to weight their messages.
-This lets the model give more influence to some neighbours than to others.
-Attention remains local when it is restricted to $N(v)$, so it does not by itself remove the layer-by-layer distance constraint.
-That distinction matters when graph attention is used as a baseline for long-range dependency learning \cite{velickovic2018gat}.
+Dependence concerns the behaviour of the fitted function under relevant input changes.
+To test this dependence, change the relevant source or path information while holding the rest of the input fixed.
+The fitted prediction should change in the way required by the target function.
+Architectural depth cannot supply this evidence because depth describes possible information flow rather than the function selected by training.
 
-Graph isomorphism networks use sum aggregation followed by multilayer perceptrons.
-The design is motivated by the need for expressive multiset aggregation.
-A sum can preserve more information about a multiset than a mean or maximum when the following function is expressive enough.
-This makes the architecture closely connected to the Weisfeiler--Leman view of graph distinguishability.
-This link is one reason GIN is often used when expressivity is part of the evaluation question \cite{xu2019gin,morris2019weisfeiler,bodnar2021weisfeiler}.
+An accuracy trend as graph distance or dependency length increases is likewise a behavioural symptom.
+It may show where a fitted system succeeds or fails under an evaluation protocol, but it does not identify the mechanism responsible for that behaviour.
+A mechanism claim requires separate evidence that the model exhibits the internal trace predicted by that mechanism.
 
-Gated and recurrent graph neural networks add mechanisms that control how much new information enters a node representation.
-The update resembles recurrent neural network gating, where a node can keep part of its previous representation while incorporating a new message \cite{graves2012supervised}.
-In long-range settings, such gates are relevant because a useful detail from the source node must remain available across several message-passing layers before it affects the target node.
-GGNN and GatedGCN are examples of architectures with this kind of gated update \cite{li2016ggnn,bresson2017residual}.
-
-Simplified graph convolutional models, such as SGC, remove some nonlinear transformations and collapse repeated propagation into a simpler linear form \cite{wu2019sgc}.
-These models are useful baselines because they separate the effect of graph propagation from the effect of deep nonlinear feature transformations.
-If a simplified model performs well, the task may be solvable largely through smoothing or linear propagation.
-If it fails while richer models succeed, the task may require more expressive one-hop transformations.
-
-Rewiring methods and graph transformers change the message-passing connectivity pattern rather than only the local message-passing rule.
-Rewiring modifies the graph by adding, removing, or reweighting edges before message passing.
-Graph transformers often allow attention between many or all pairs of nodes and then add structural or positional information to keep the graph visible to the model.
-These systems are important for long-range learning because they can reduce the number of message-passing layers needed for a source node to affect a target node.
-They also complicate evaluation, since a model may perform well by using information that is not carried by the intended graph dependency.
-Representative examples include rewiring methods and graph transformers used in long-range graph learning studies \cite{alon2021bottleneck,gutteridge2023drew,dwivedi2020graphtransformer,kreuzer2021san,rampasek2022gps}.
-
-\section{Expressivity}
-
-Expressivity describes the set of graph functions expressible by a model class.
-For node classification, the function maps a graph and a target node to a label.
-For graph classification, it maps a whole graph to a label.
-The target function must be expressible by the evaluated model class before failure on GLoRa can be attributed to learning rather than expressivity.
-
-Local message passing imposes an immediate expressivity limit.
-With $L$ layers, a node representation cannot depend on nodes outside its $L$-layer receptive field.
-Consider a node classification function whose label at $v$ changes when only a node at distance greater than $L$ changes, with no other input carrying that information to $v$.
-This function is not expressible by an $L$-layer local message-passing GNN.
-This limitation follows from locality and does not depend on optimisation.
-
-There are also expressivity limits inside the receptive field.
-Aggregation compresses a multiset of neighbour representations into a fixed-size vector.
-If two different neighbourhood multisets produce the same aggregate, the rest of the layer cannot recover the difference.
-Mean aggregation, max aggregation, attention aggregation, and sum aggregation lose different kinds of information.
-The choice of aggregation therefore affects which local patterns can be represented.
-
-Permutation symmetry also limits expressivity in a principled way.
-An equivariant node classifier can distinguish a node only through its features, its structural position, and the features and structure around it.
-It cannot use an arbitrary node identifier unless that identifier is provided as a feature.
-An invariant graph classifier cannot distinguish two isomorphic featured graphs.
-These are not defects of graph learning.
-They are the conditions under which the model respects the graph abstraction.
-
-Theoretical work connects message-passing expressivity to logical and combinatorial notions of graph distinguishability \cite{barcelo2020logical}.
-The details are beyond the scope of this chapter, but the practical lesson is direct.
-Two graphs or two rooted nodes may be mathematically different while still being indistinguishable to a given message-passing architecture.
-When this happens, no amount of training data can make that architecture separate them unless the architecture or input features are changed.
-
-Expressivity should be separated from optimisation.
-If a target function is not expressible, training failure is expected.
-If the target function is expressible, the model may still fail because the optimiser does not find the right parameters.
-Long-range graph learning requires both conditions: the target function must lie inside the model class, and the learning process must find parameters that use the long-range dependency.
-
-\section{Why Benchmark Target Functions Must Be Expressible}
-
-Long-range benchmarks must rule out shortcut functions while keeping the intended target function expressible.
-In GLoRa, accuracy is intended to provide evidence about a dependency of length $d$.
-That interpretation fails if the score can be earned without using the intended source-to-target path or if the target function is not expressible by the evaluated model.
-The GLoRa paper is motivated by avoiding both errors \cite{zhou2025glora}.
-
-The first source of ambiguity is a shortcut function.
-The benchmark examples may be generated from a rule that involves a long path, while the finite dataset can also be fitted by another rule that does not use that path.
-A model that learns the shortcut may obtain high accuracy.
-The score then fails to show that the model learned the intended dependency.
-This is especially dangerous when the shortcut is easier for the architecture than the long-range rule.
-
-Shortcuts can arise from local features, global counts, graph size, degree patterns, label imbalance, or construction artefacts.
-For example, if all negative examples contain a special local marker that positive examples never contain, a classifier can use the marker without using the intended path.
-If all positive graphs have a different number of nodes from all negative graphs, a graph classifier can use size.
-If only one class contains a certain kind of local neighbourhood, a shallow GNN may solve the benchmark without using information at large graph distance.
-The benchmark may look long-range by construction while rewarding a short-range or graph-level statistic.
-
-The second source of ambiguity is an inexpressible target function.
-The intended rule may genuinely require a long-range dependency, but it may be inexpressible by the evaluated model class even in principle.
-Low accuracy then does not reveal a failure to learn long-range dependencies.
-It may only reveal that the benchmark asked the model to compute a function outside its expressive power.
-When a benchmark is used to compare methods, it should not penalise a model for failing a task that its class cannot express.
-
-Together, these two cases make accuracy ambiguous.
-High accuracy is uninformative when shortcuts exist, and low accuracy is uninformative when the intended function is inexpressible.
-A long-range benchmark must therefore satisfy two conditions at once: it should force any fitting function to rely on the intended dependency length, and it should keep the intended function expressible by the model families under study.
-
-These conditions explain why the message-passing formalism matters for evaluation.
-Whether the target function is expressible must be assessed against the model class being evaluated.
-If the benchmark is meant to test local message-passing systems, then the intended function should be computable by a suitable message-passing architecture with enough layers.
-If the benchmark is meant to compare local GNNs with rewired models or graph transformers, then the construction should still make clear what dependency the score certifies.
-Otherwise, better accuracy may reflect a shortcut, an added edge, or an advantage unrelated to the intended dependency.
-
-GLoRa addresses these two requirements by generating examples for a chosen dependency length.
-The positive and negative cases are designed so that fitting enough examples requires sensitivity to the nodes along a path of that length.
-The intended function nevertheless remains expressible by standard GNN-based systems when the architecture has enough capacity and depth \cite{zhou2025glora,barcelo2020logical}.
-The resulting score can therefore be interpreted as evidence about how long a dependency the system can learn before performance collapses.
-
-\section{Chapter Summary}
-
-This chapter established the formal link from graph structure to benchmark interpretation.
-Graph distance, message-passing layers, node representations, and readout functions determine whether a benchmark score can establish that a model used the intended dependency.
-
-The shared notation is $G=(V,E,\lambda)$, with directed edges $(u,v)\in E$, node features $\lambda:V\to\mathbb{R}^{n}$, and incoming neighbourhoods $N(v)=\{u\in V\mid (u,v)\in E\}$.
-Message-passing GNNs set $h_v^{(0)}=\lambda(v)$ and update node representations through neighbourhood aggregation and node-wise combination.
-The layer index is $\ell$, so $h_v^{(\ell)}$ denotes the representation of node $v$ at layer $\ell$.
-
-At node level, this formalism is local and permutation equivariant.
-An invariant graph-level readout makes the final output permutation invariant.
-After $\ell$ layers, a node can depend only on information in its $\ell$-layer receptive field.
-Graph distance and dependency length therefore connect architectural reach to benchmark design.
-A long-range benchmark must control both shortcut functions and expressibility before its score can show whether the system learned the intended graph dependency.
+Chapter 3 builds on this distinction by defining the path-aware dependency that an evaluation must demonstrate.
+It separates graph distance and path length from the dependency length required by the target function.
+The premise for that definition is the limit established here: being inside a receptive field does not demonstrate dependence.

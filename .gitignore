@@ -5,7 +5,9 @@ output/
 *.blg
 *.fdb_latexmk
 *.fls
+*.lof
 *.log
+*.lot
 *.out
 *.toc
 main.pdf

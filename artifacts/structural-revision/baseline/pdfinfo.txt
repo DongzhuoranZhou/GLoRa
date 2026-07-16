@@ -1,0 +1,22 @@
+Title:           Long-Range Dependency Learning in Graph Neural Networks: Benchmarks, Explanations, and Limits
+Subject:         PhD thesis
+Keywords:        graph neural networks, long-range dependencies, benchmark design, GLoRa
+Author:          Dongzhuoran Zhou
+Creator:         LaTeX with hyperref
+Producer:        pdfTeX-1.40.25
+CreationDate:    Thu Jul 16 10:15:03 2026 UTC
+ModDate:         Thu Jul 16 10:15:03 2026 UTC
+Custom Metadata: yes
+Metadata Stream: no
+Tagged:          no
+UserProperties:  no
+Suspects:        no
+Form:            none
+JavaScript:      no
+Pages:           113
+Encrypted:       no
+Page size:       595.276 x 841.89 pts (A4)
+Page rot:        0
+File size:       8809033 bytes
+Optimized:       no
+PDF version:     1.5

@@ -5,6 +5,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{array}
+\usepackage{graphicx}
 \usepackage{textcomp}
 \usepackage{url}
 \urlstyle{sf}
@@ -34,36 +35,39 @@
 
 \begin{abstract}
 Graph neural networks usually compute node representations by passing messages between neighbouring nodes.
-This local mechanism follows the graph structure, but it creates a difficulty when the label of a target node depends on information many hops away.
-Many graph learning systems lose accuracy on such tasks.
-This decline is often attributed to over-smoothing, over-squashing, or vanishing gradients.
+This local mechanism makes learning difficult when the label of a target node depends on information many hops away.
 
-This thesis studies long-range dependency learning in graph neural networks as both an architectural and an evaluation problem.
-The included paper introduces GLoRa, a synthetic benchmark generator for this purpose.
-GLoRa creates node-classification tasks parameterised by dependency length.
-The tasks are designed so that fitting the generated examples requires learning the intended path-aware dependency.
+Falling accuracy as dependency length increases does not by itself show which dependency a system learned or why its performance fell.
+A benchmark may also permit shortcut functions that fit its examples without using the intended dependency.
 
-Experiments with GLoRa show that many evaluated graph learning systems fail as dependency length grows.
-In the tested setting, diagnostics for over-smoothing, over-squashing, and vanishing gradients do not fully explain the observed drop.
+GLoRa is a synthetic benchmark generator for inductive binary node classification, parameterised by dependency length.
+For any chosen precision and probability, GLoRa provides a corresponding sample-size condition under which, with at least that probability, every function fitting the generated sample relies on the intended path-aware dependency to that precision.
+The model family under evaluation can nevertheless express a function that fits the examples.
 
-Together, these findings and the surrounding literature show why benchmark performance can be misleading when a task rewards shortcut functions that bypass the dependency it is meant to test.
+Many tested systems lose accuracy as the generator's dependency-length parameter increases.
+In the setting examined, the reported diagnostics do not support treating over-smoothing, the tested directed-path account of over-squashing, or vanishing weight gradients as complete explanations.
+
+These results provide controlled evidence for one family of long-range dependencies, not a universal account of long-range graph learning.
 \end{abstract}
 
 \begin{xabstract}[Sammendrag]
-Grafnevrale nettverk beregner vanligvis noderepresentasjoner gjennom lokal naboskapsaggregering.
-Denne lokale mekanismen utnytter grafstrukturen, men den skaper også en utfordring når en prediksjon avhenger av informasjon som har stor grafavstand til målnoden.
-Mange grafbaserte læringssystemer mister nøyaktighet på slike oppgaver.
-Dette tapet forklares ofte med over-smoothing, over-squashing eller forsvinnende gradienter.
+Grafnevrale nettverk beregner vanligvis noderepresentasjoner ved lokal meldingsutveksling mellom nabonoder.
+Denne lokale mekanismen skaper en utfordring når etiketten til en målnode avhenger av informasjon mange hopp unna.
 
-Avhandlingen undersøker hvordan grafnevrale nettverk lærer langtrekkende avhengigheter.
-Hovedspørsmålet er hvordan man kan teste om et grafbasert læringssystem faktisk har lært en avhengighet med en bestemt lengde.
-Den inkluderte artikkelen introduserer GLoRa, en syntetisk benchmark-generator for dette formålet.
-GLoRa lager nodeklassifiseringsoppgaver med en valgt avhengighetslengde.
-Oppgavene er konstruert slik at en modell må lære den tilsiktede avhengigheten for å tilpasse seg eksemplene.
+Et fall i nøyaktighet når avhengighetslengden øker, viser ikke i seg selv hvilken avhengighet et system har lært eller hvorfor ytelsen faller.
+En benchmark kan også åpne for snarveier: funksjoner som gir riktige svar på eksemplene uten å bruke den tilsiktede avhengigheten.
 
-Den utvidede innledningen plasserer GLoRa i litteraturen om grafnevrale nettverk, langtrekkende avhengigheter, over-smoothing, over-squashing, grafomkobling, graftransformere og benchmark-design.
-Avhandlingen argumenterer for at langtrekkende graflæring ikke bare er et arkitekturproblem.
-Det er også et evalueringsproblem, fordi en benchmark kan belønne snarveier som ikke bruker den avhengigheten den er ment å teste.
+GLoRa er en generator for syntetiske benchmarker innen induktiv binær nodeklassifisering, med avhengighetslengde som parameter.
+For ethvert valgt presisjonsnivå og sannsynlighetsnivå gir GLoRa en tilhørende betingelse på utvalgsstørrelsen.
+Når betingelsen er oppfylt, gjelder det med minst den valgte sannsynligheten at enhver funksjon som gir riktige svar på det genererte utvalget, er avhengig av den tilsiktede stiavhengigheten med den valgte presisjonen.
+Modellfamilien som evalueres, kan likevel representere en slik funksjon.
+
+Mange av de testede systemene får lavere nøyaktighet når generatorens parameter for avhengighetslengde øker.
+I det undersøkte eksperimentelle oppsettet gir de rapporterte diagnostiske analysene ikke tilstrekkelig støtte til å anse over-smoothing eller forsvinnende vektgradienter som fullstendige forklaringer.
+Det samme gjelder den testede forklaringen på over-squashing, som bygger på rettede stier.
+
+Resultatene gir et kontrollert empirisk grunnlag for å vurdere læring innenfor én familie av langtrekkende avhengigheter.
+De gir ikke en universell forklaring på læring av langtrekkende avhengigheter i grafer.
 \end{xabstract}
 
 \begin{preface}
@@ -71,12 +75,12 @@ This thesis was written at the Department of Informatics, University of Oslo, un
 I am grateful to my supervisors for their guidance, feedback, and support throughout my work on GLoRa and this thesis.
 I also thank my collaborators and colleagues for the discussions that helped shape the ideas presented here.
 
-The thesis follows the article-based format.
-The extended introduction gives the background, state of the art, and thesis-level discussion.
-The included paper is reproduced after the kappa.
+This article-based thesis comprises a kappa followed by one included paper.
 \end{preface}
 
 \tableofcontents
+\listoffigures
+\listoftables
 
 \chapter*{List of Papers}
 \addcontentsline{toc}{chapter}{List of Papers}
@@ -87,6 +91,12 @@ Dongzhuoran Zhou, Evgeny Kharlamov, and Egor V. Kostylev.
 \emph{GLoRa: A Benchmark to Evaluate the Ability to Learn Long-Range Dependencies in Graphs}.
 Published as a conference paper at ICLR 2025.
 \end{description}
+
+\chapter*{Author Contribution}
+\addcontentsline{toc}{chapter}{Author Contribution}
+
+Dongzhuoran Zhou is the first author of Paper I.
+The kappa synthesises the contribution of Paper I within the broader thesis.
 
 \mainmatter
 

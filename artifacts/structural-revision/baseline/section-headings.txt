@@ -1,0 +1,78 @@
+chapters/chapter06-glora-contribution.tex:1:\chapter{The GLoRa Contribution}
+chapters/chapter06-glora-contribution.tex:15:\section{Motivation}
+chapters/chapter06-glora-contribution.tex:47:\section{Path-Aware Dependency and Notation}
+chapters/chapter06-glora-contribution.tex:91:\section{Benchmark Design}
+chapters/chapter06-glora-contribution.tex:161:\section{Examples and the Role of Shortcuts}
+chapters/chapter06-glora-contribution.tex:200:\section{Why Expressibility Matters}
+chapters/chapter06-glora-contribution.tex:232:\section{Experimental Protocol}
+chapters/chapter06-glora-contribution.tex:268:\section{Main Findings}
+chapters/chapter06-glora-contribution.tex:299:\section{Diagnostic Findings}
+chapters/chapter06-glora-contribution.tex:307:\subsection{Over-smoothing}
+chapters/chapter06-glora-contribution.tex:318:\subsection{Over-squashing}
+chapters/chapter06-glora-contribution.tex:332:\subsection{Vanishing gradients}
+chapters/chapter06-glora-contribution.tex:346:\section{Thesis-Level Interpretation}
+chapters/chapter07-discussion-conclusion.tex:1:\chapter{Discussion and Conclusion}
+chapters/chapter07-discussion-conclusion.tex:10:\section{Summary}
+chapters/chapter07-discussion-conclusion.tex:41:\section{Significance}
+chapters/chapter07-discussion-conclusion.tex:68:\section{Limitations}
+chapters/chapter07-discussion-conclusion.tex:107:\section{Future Directions}
+chapters/chapter07-discussion-conclusion.tex:136:\section{Concluding Remarks}
+chapters/chapter02-graph-learning-message-passing.tex:1:\chapter[Graph Learning and Message Passing]{Graph Learning and Message\\Passing}
+chapters/chapter02-graph-learning-message-passing.tex:29:\section{Graphs and Features}
+chapters/chapter02-graph-learning-message-passing.tex:72:\section{Graph Learning Tasks}
+chapters/chapter02-graph-learning-message-passing.tex:111:\section{Message-Passing Graph Neural Networks}
+chapters/chapter02-graph-learning-message-passing.tex:168:\section{Locality and Receptive Fields}
+chapters/chapter02-graph-learning-message-passing.tex:207:\section{Permutation Equivariance and Invariance}
+chapters/chapter02-graph-learning-message-passing.tex:253:\section{Standard Architectures at a Conceptual Level}
+chapters/chapter02-graph-learning-message-passing.tex:301:\section{Expressivity}
+chapters/chapter02-graph-learning-message-passing.tex:337:\section{Why Benchmark Target Functions Must Be Expressible}
+chapters/chapter02-graph-learning-message-passing.tex:377:\section{Chapter Summary}
+chapters/chapter03-long-range-dependencies.tex:1:\chapter{Long-Range Dependencies in Graphs}
+chapters/chapter03-long-range-dependencies.tex:3:\section{What a Long-Range Dependency Is}
+chapters/chapter03-long-range-dependencies.tex:42:\section{The Informal View}
+chapters/chapter03-long-range-dependencies.tex:65:\section{A Formal View Based on Paths}
+chapters/chapter03-long-range-dependencies.tex:109:\section{Graph Distance, Path Length, and Dependency Length}
+chapters/chapter03-long-range-dependencies.tex:143:\section{Why Path-Aware Dependencies Matter}
+chapters/chapter03-long-range-dependencies.tex:174:\section{Node-Level and Graph-Level Dependencies}
+chapters/chapter03-long-range-dependencies.tex:210:\section{Examples Across Graph Domains}
+chapters/chapter03-long-range-dependencies.tex:227:\section{Large Receptive Field Is Not the Same as Long-Range Learning}
+chapters/chapter03-long-range-dependencies.tex:261:\section{Dependency Length as an Evaluation Parameter}
+chapters/chapter03-long-range-dependencies.tex:292:\section{Implications for Evaluation}
+chapters/chapter05-state-of-the-art.tex:1:\chapter{State of the Art}
+chapters/chapter05-state-of-the-art.tex:15:\section{Standard Message-Passing Architectures}
+chapters/chapter05-state-of-the-art.tex:24:\subsection{Convolution and neighbourhood aggregation}
+chapters/chapter05-state-of-the-art.tex:53:\subsection{Gated and simplified message passing}
+chapters/chapter05-state-of-the-art.tex:100:\section{Depth Methods for Over-Smoothing}
+chapters/chapter05-state-of-the-art.tex:113:\subsection{Normalization and stochastic regularization}
+chapters/chapter05-state-of-the-art.tex:132:\subsection{Layer selection and initial residuals}
+chapters/chapter05-state-of-the-art.tex:184:\section{Bottlenecks and Graph Rewiring}
+chapters/chapter05-state-of-the-art.tex:198:\subsection{Diffusion and higher-order propagation}
+chapters/chapter05-state-of-the-art.tex:216:\subsection{Shortest paths and distance-aware message passing}
+chapters/chapter05-state-of-the-art.tex:231:\subsection{Curvature and spectral rewiring}
+chapters/chapter05-state-of-the-art.tex:273:\section[Graph Transformers]{Graph Transformers and Positional or Structural Encodings}
+chapters/chapter05-state-of-the-art.tex:281:\subsection{Global attention and graph structure}
+chapters/chapter05-state-of-the-art.tex:299:\subsection{Positional and structural encodings}
+chapters/chapter05-state-of-the-art.tex:347:\section{Real-World Graph Benchmarks}
+chapters/chapter05-state-of-the-art.tex:396:\section{Synthetic Long-Range Benchmarks}
+chapters/chapter05-state-of-the-art.tex:409:\subsection{Chain and transfer benchmarks}
+chapters/chapter05-state-of-the-art.tex:428:\subsection{Tree and proximity benchmarks}
+chapters/chapter05-state-of-the-art.tex:447:\subsection{Connectivity benchmarks}
+chapters/chapter05-state-of-the-art.tex:484:\section{Synthesis: What the State of the Art Leaves Open}
+chapters/chapter04-failure-explanations.tex:1:\chapter{Explanations of Long-Range Failure}
+chapters/chapter04-failure-explanations.tex:26:\section{What a Candidate Explanation Must Explain}
+chapters/chapter04-failure-explanations.tex:49:\section{Over-Smoothing}
+chapters/chapter04-failure-explanations.tex:84:\section{Over-Squashing}
+chapters/chapter04-failure-explanations.tex:127:\section{Vanishing Gradients}
+chapters/chapter04-failure-explanations.tex:164:\section{How the Explanations Interact}
+chapters/chapter04-failure-explanations.tex:192:\section{What the Diagnostics Leave Open}
+chapters/chapter04-failure-explanations.tex:214:\section{The Role of GLoRa in the Explanation}
+main.tex:81:\chapter*{List of Papers}
+chapters/chapter01-introduction.tex:1:\chapter{Introduction}
+chapters/chapter01-introduction.tex:34:\section{Why Graph Learning Matters}
+chapters/chapter01-introduction.tex:66:\section{Long-Range Dependencies in Graphs}
+chapters/chapter01-introduction.tex:92:\section{Why Long-Range Dependencies Are Difficult}
+chapters/chapter01-introduction.tex:124:\section{Evaluation as a Central Problem}
+chapters/chapter01-introduction.tex:155:\section{The Role of GLoRa}
+chapters/chapter01-introduction.tex:188:\section{Research Questions}
+chapters/chapter01-introduction.tex:214:\section{Contributions}
+chapters/chapter01-introduction.tex:248:\section{Outline}
